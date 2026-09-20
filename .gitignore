@@ -1,0 +1,8 @@
+# Ce dossier est aussi une planche Atelier (tableau #optimisation). Ces deux
+# dossiers appartiennent a la planche, pas au projet, et ne sont jamais
+# publies :
+#   .atelier/  — packs.toml, le texte du contexte de l'etiquette #optimisation
+#   .claude/   — des liens symboliques vers ~/Documents/GitHub/atelier/skills/
+# Ne pas les deplacer : atelier/projects/optimisation.toml pointe dessus.
+.atelier/
+.claude/

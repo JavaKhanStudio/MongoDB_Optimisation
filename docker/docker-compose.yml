@@ -1,0 +1,42 @@
+name: optimisation
+
+# Un seul moteur : l'exercice ne part plus du SQL, il part du modele document
+# que « SQL vers NoSQL » a fait ecrire. Le depot est monte en /projet : les .js
+# se jouent sans copier de fichier.
+#
+# wiredTigerCacheSizeGB est FIXE a 1 Go, et pas laisse au defaut : le defaut est
+# la moitie de la RAM de la machine, et les chiffres des SUJET.md ne seraient pas
+# les memes d'un poste a l'autre. 1 Go tient sur n'importe quel portable et
+# contient les trois bases a VOLUME=1.
+#
+# Un cache plus petit avait ete essaye — 256 Mo, pour forcer le disque a servir
+# et rendre un balayage lent. Mauvaise idee : des que les donnees depassent le
+# cache, l'ECRITURE s'effondre aussi (VOLUME=10 a mis deux heures a charger au
+# lieu de la minute attendue). Et ca ne servait a rien : la colonne qu'on
+# regarde, « lus », ne depend pas du cache. Seule la colonne « ms » en depend,
+# et elle n'est la que pour l'impression.
+
+services:
+
+  mongo:
+    image: mongo:8.0
+    container_name: optimisation-mongo
+    environment:
+      # MongoDB 8 refuse de demarrer sur un noyau >= 6.19 (SERVER-121912).
+      # Meme contournement que MongoDB_ACID et MongoDB_SQLversNoSQL.
+      GLIBC_TUNABLES: glibc.pthread.rseq=1
+    command: ["--bind_ip_all", "--wiredTigerCacheSizeGB=1"]
+    ports:
+      - "27051:27017"
+    volumes:
+      - ../:/projet:z
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  mongodata:
