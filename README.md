@@ -55,6 +55,10 @@ cd MongoDB_Optimisation
 .\make dune-mesurer
 ```
 
+Au premier `.\make demarrer`, le pare-feu Windows demande s'il faut laisser
+« Docker Desktop Backend » accéder aux réseaux : **Annuler** suffit, tout passe
+par `localhost` ; **Autoriser** ne gêne pas non plus.
+
 `.\make` remplace `make` dans **toutes** les commandes de ce README, réglages
 compris : `.\make dune VOLUME=10`, `.\make aide`. Dans l'invite de commandes
 (`cmd`), `make dune` suffit.
