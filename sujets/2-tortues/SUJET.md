@@ -54,6 +54,54 @@ cette page sont ceux de `VOLUME=1`.
 
 ---
 
+## Les quatre requêtes
+
+Telles qu'on les tape dans `make tortues-mongo`, valeurs en dur. Le banc
+joue les mêmes, écrites en JavaScript dans [`requetes.js`](requetes.js). Sous
+chacune, les champs qu'elle sollicite : c'est là que le serveur travaille.
+
+**R1 — « Tout ce qu'Aline Roy a observé. »**
+
+```js
+db.observations.find({ observateur: "Aline Roy" })
+```
+
+Sollicite : `observateur`, en égalité. Rien d'autre.
+
+**R2 — « Les observations faites à Lady Elliot en 2025, de la plus récente à la plus ancienne. »**
+
+```js
+db.observations.find({
+  site: "Lady Elliot",
+  date: { $gte: ISODate("2025-01-01"), $lt: ISODate("2026-01-01") }
+}).sort({ date: -1 })
+```
+
+Sollicite : `site` en égalité, `date` en intervalle — et `date` encore, pour le tri.
+
+**R3 — « Le score de santé moyen des tortues en danger critique observées en juillet 2026, site par site. »**
+
+```js
+db.observations.aggregate([
+  { $match: { date: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") } } },
+  { $lookup: { from: "tortues", localField: "tortue", foreignField: "_id", as: "t" } },
+  { $match: { "t.espece.statutUicn": "CR" } },
+  { $group: { _id: "$site", somme: { $sum: "$scoreSante" }, n: { $sum: 1 } } }
+])
+```
+
+Sollicite : `date` en intervalle, dans `observations`. Puis, pour chaque observation gardée, l'`_id` de la collection `tortues`. Puis `espece.statutUicn`, en égalité — mais il est dans `tortues`, pas dans `observations`. Enfin `site` et `scoreSante`, pour le regroupement.
+
+**R4 — « Les tortues marquées migration-longue. »**
+
+```js
+db.tortues.find({ tags: "migration-longue" })
+```
+
+Sollicite : `tags`, en égalité — sur un champ qui est un tableau.
+
+---
+
 ## Ce que les quatre requêtes coûtent aujourd'hui
 
 `make tortues-mesurer`, sur la base fraîchement chargée :

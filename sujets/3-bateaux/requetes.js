@@ -27,6 +27,9 @@ const PARAM = {
 // R1 — « Le carnet de bord du Delta Amstel. »
 //      Une egalite sur un champ. La cle etrangere de SQL portait un
 //      index ; ici, rien n'est automatique.
+//
+//      En clair, dans make bateaux-mongo :
+//      db.escales.find({ bateau: "IMO9500233" })
 // ---------------------------------------------------------------------
 
 function filtreR1() { return { bateau: PARAM.imo }; }
@@ -40,6 +43,12 @@ function ligneR1(e) {
 // R2 — « Les escales de Rotterdam en 2025, de la plus recente a la plus
 //      ancienne. »
 //      Une egalite, un intervalle, un tri.
+//
+//      En clair, dans make bateaux-mongo :
+//      db.escales.find({
+//        port: "Rotterdam",
+//        arrivee: { $gte: ISODate("2025-01-01"), $lt: ISODate("2026-01-01") }
+//      }).sort({ arrivee: -1 })
 // ---------------------------------------------------------------------
 
 function filtreR2() {
@@ -55,6 +64,14 @@ function ligneR2(e) {
 //      Le pavillon n'est PAS dans l'escale : il est dans le bateau. Il
 //      faut ouvrir le bateau de chaque escale de l'annee avant de
 //      pouvoir jeter celles qui ne sont pas francaises.
+//
+//      En clair, dans make bateaux-mongo :
+//      db.escales.aggregate([
+//        { $match: { arrivee: { $gte: ISODate("2026-01-01"), $lt: ISODate("2027-01-01") } } },
+//        { $lookup: { from: "bateaux", localField: "bateau", foreignField: "_id", as: "b" } },
+//        { $match: { "b.pavillon": "France" } },
+//        { $group: { _id: "$port", tonnes: { $sum: { $sum: "$cargaisons.tonnes" } }, n: { $sum: 1 } } }
+//      ])
 // ---------------------------------------------------------------------
 
 function pipelineR3() {
@@ -74,6 +91,13 @@ function ligneR3(r) {
 //      Le tonnage d'une escale, c'est la somme de ses cargaisons. Il
 //      n'est ecrit nulle part : il se recalcule a chaque fois, pour les
 //      94 500 escales, avant de pouvoir en garder dix.
+//
+//      En clair, dans make bateaux-mongo :
+//      db.escales.aggregate([
+//        { $set:   { total: { $sum: "$cargaisons.tonnes" } } },
+//        { $sort:  { total: -1, _id: 1 } },
+//        { $limit: 10 }
+//      ])
 // ---------------------------------------------------------------------
 
 function pipelineR4() {

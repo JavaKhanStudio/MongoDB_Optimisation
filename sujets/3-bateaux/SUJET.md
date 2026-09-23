@@ -54,6 +54,58 @@ cette page sont ceux de `VOLUME=1`.
 
 ---
 
+## Les quatre requêtes
+
+Telles qu'on les tape dans `make bateaux-mongo`, valeurs en dur. Le banc
+joue les mêmes, écrites en JavaScript dans [`requetes.js`](requetes.js). Sous
+chacune, les champs qu'elle sollicite : c'est là que le serveur travaille.
+
+**R1 — « Le carnet de bord du Delta Amstel. »**
+
+```js
+db.escales.find({ bateau: "IMO9500233" })
+```
+
+Sollicite : `bateau`, en égalité. Rien d'autre.
+
+**R2 — « Les escales de Rotterdam en 2025, de la plus récente à la plus ancienne. »**
+
+```js
+db.escales.find({
+  port: "Rotterdam",
+  arrivee: { $gte: ISODate("2025-01-01"), $lt: ISODate("2026-01-01") }
+}).sort({ arrivee: -1 })
+```
+
+Sollicite : `port` en égalité, `arrivee` en intervalle — et `arrivee` encore, pour le tri.
+
+**R3 — « Ce que les bateaux sous pavillon français ont manipulé en 2026, port par port. »**
+
+```js
+db.escales.aggregate([
+  { $match: { arrivee: { $gte: ISODate("2026-01-01"), $lt: ISODate("2027-01-01") } } },
+  { $lookup: { from: "bateaux", localField: "bateau", foreignField: "_id", as: "b" } },
+  { $match: { "b.pavillon": "France" } },
+  { $group: { _id: "$port", tonnes: { $sum: { $sum: "$cargaisons.tonnes" } }, n: { $sum: 1 } } }
+])
+```
+
+Sollicite : `arrivee` en intervalle, dans `escales`. Puis, pour chaque escale gardée, l'`_id` de la collection `bateaux`. Puis `pavillon`, en égalité — mais il est dans `bateaux`, pas dans `escales`. Enfin `port` et `cargaisons.tonnes`, pour le regroupement.
+
+**R4 — « Les dix escales qui ont manipulé le plus de tonnage. »**
+
+```js
+db.escales.aggregate([
+  { $set:   { total: { $sum: "$cargaisons.tonnes" } } },
+  { $sort:  { total: -1, _id: 1 } },
+  { $limit: 10 }
+])
+```
+
+Sollicite : Aucun filtre. `cargaisons.tonnes`, additionné pour chaque escale — puis `total` pour le tri, un champ qu'on vient de calculer et qui n'est écrit nulle part.
+
+---
+
 ## Ce que les quatre requêtes coûtent aujourd'hui
 
 `make bateaux-mesurer`, sur la base fraîchement chargée :

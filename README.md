@@ -203,11 +203,15 @@ sujets/outils.js            le tirage reproductible, la mise en forme, et LE
 sujets/mesurer.js           make <sujet>-mesurer
 sujets/remettre.js          make <sujet>-remettre
 sujets/<n>-<sujet>/
-    SUJET.md                l'enonce : le modele, les chiffres, les exercices
+    SUJET.md                l'enonce : le modele, les quatre requetes en clair,
+                            les chiffres, les exercices
     charger.js              fabrique les donnees, les charge, et calcule la
                             reponse attendue des quatre requetes
     requetes.js             LES QUATRE REQUETES — le fichier de l'etudiant
     optimiser.js            LA CORRECTION (branche correction)
+tools/verifier-en-clair.js  joue les requetes ecrites en clair (SUJET.md et
+                            requetes.js) et verifie qu'elles rendent les
+                            lignes du JavaScript
 ```
 
 `make arreter` conserve les données, `make purger` efface le volume.

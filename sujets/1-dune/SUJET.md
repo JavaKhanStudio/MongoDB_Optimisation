@@ -56,6 +56,56 @@ d'une collection à l'autre. C'est un modèle qu'on n'a pas encore regardé tour
 
 ---
 
+## Les quatre requêtes
+
+Telles qu'on les tape dans `make dune-mongo`, valeurs en dur. Le banc
+joue les mêmes, écrites en JavaScript dans [`requetes.js`](requetes.js). Sous
+chacune, les champs qu'elle sollicite : c'est là que le serveur travaille.
+
+**R1 — « Tout ce que Gurney Halleck a sorti. »**
+
+```js
+db.collectes.find({ contremaitre: "Gurney Halleck" })
+```
+
+Sollicite : `contremaitre`, en égalité. Rien d'autre.
+
+**R2 — « Les échecs du puits HAB-02 en juillet 2026, du plus récent au plus ancien. »**
+
+```js
+db.collectes.find({
+  puits: "HAB-02",
+  statut: "ECHOUEE",
+  debut: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") }
+}).sort({ debut: -1 })
+```
+
+Sollicite : `puits` et `statut` en égalité, `debut` en intervalle — et `debut` encore, pour le tri.
+
+**R3 — « Ce que la région Erg Habbanya a sorti en juillet 2026, puits par puits. »**
+
+```js
+db.collectes.aggregate([
+  { $match: { statut: "REUSSIE",
+              debut: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") } } },
+  { $lookup: { from: "puits", localField: "puits", foreignField: "_id", as: "p" } },
+  { $match: { "p.region": "Erg Habbanya" } },
+  { $group: { _id: "$puits", tonnes: { $sum: "$tonnes" }, n: { $sum: 1 } } }
+])
+```
+
+Sollicite : `statut` en égalité et `debut` en intervalle, dans `collectes`. Puis, pour chaque collecte gardée, l'`_id` de la collection `puits`. Puis `region`, en égalité — mais `region` est dans `puits`, pas dans `collectes`. Enfin `puits` et `tonnes`, pour le regroupement.
+
+**R4 — « Les dix plus fortes secousses relevées au puits MUR-01. »**
+
+```js
+db.releves.find({ puits: "MUR-01" }).sort({ amplitude: -1, mesureLe: -1 }).limit(10)
+```
+
+Sollicite : `puits` en égalité, puis `amplitude` et `mesureLe` pour le tri.
+
+---
+
 ## Ce que les quatre requêtes coûtent aujourd'hui
 
 `make dune-mesurer`, sur la base fraîchement chargée :
