@@ -152,7 +152,7 @@ passage :
 
 ```
 === La reponse n a pas change ? ===========================================
-  Les 4 reponses sont celles du chargement : optimise, pas change.
+  Les 7 reponses sont celles du chargement : optimise, pas change.
 ```
 
 Un étudiant qui réécrit une requête est donc comparé à la vérité, pas à
@@ -180,10 +180,13 @@ Ce que la correction imprime, sur `dune` :
 
 ```
   code  ce qu elle demande                           lus avant   lus apres     gain   ms avant  ms apres
-  R1    Les collectes d un contremaitre                 37 500         169    222 x         14         6
-  R2    Les echecs d un puits, du plus recent           37 500           7   5357 x         10         3
-  R3    Ce qu une region a sorti sur un mois            38 585         101    382 x         17         2
-  R4    Les dix plus fortes secousses d un puits        62 500          10   6250 x         15         5
+  R1    Les collectes d un contremaitre                 37 500         169    222 x         26         6
+  R2    Les echecs d un puits, du plus recent           37 500           7   5357 x         18         4
+  R3    Les collectes perdues a cause d un ver          37 500         108    347 x         22         5
+  R4    Les dix plus fortes secousses d un puits        62 500          10   6250 x         32         3
+  R5    Ce qu une region a sorti sur un mois            38 585         101    382 x         31         3
+  R6    Les collectes d un puits sur un mois            37 500          32   1172 x         18         2
+  R7    Les dix collectes au meilleur rendement         37 500          10   3750 x         47         4
 ```
 
 Le « avant » n'est **pas un chiffre recopié** : la correction commence par
