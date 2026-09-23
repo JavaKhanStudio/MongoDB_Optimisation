@@ -29,6 +29,9 @@ const PARAM = {
 //      Une egalite sur un champ. C'est la requete que SQL servait sans
 //      qu'on y pense : la cle etrangere vers observateur y portait un
 //      index, offert avec la contrainte.
+//
+//      En clair, dans make tortues-mongo :
+//      db.observations.find({ observateur: "Aline Roy" })
 // ---------------------------------------------------------------------
 
 function filtreR1() { return { observateur: PARAM.observateur }; }
@@ -40,6 +43,12 @@ function ligneR1(o) {
 // R2 — « Les observations faites a Lady Elliot en 2025, de la plus
 //      recente a la plus ancienne. »
 //      Une egalite, un intervalle, un tri.
+//
+//      En clair, dans make tortues-mongo :
+//      db.observations.find({
+//        site: "Lady Elliot",
+//        date: { $gte: ISODate("2025-01-01"), $lt: ISODate("2026-01-01") }
+//      }).sort({ date: -1 })
 // ---------------------------------------------------------------------
 
 function filtreR2() {
@@ -56,6 +65,14 @@ function ligneR2(o) {
 //      l'espece de la tortue, recopie dans la tortue. Il faut donc
 //      ouvrir la tortue de chaque observation avant de pouvoir jeter
 //      celles qui ne sont pas d'une espece en danger critique.
+//
+//      En clair, dans make tortues-mongo :
+//      db.observations.aggregate([
+//        { $match: { date: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") } } },
+//        { $lookup: { from: "tortues", localField: "tortue", foreignField: "_id", as: "t" } },
+//        { $match: { "t.espece.statutUicn": "CR" } },
+//        { $group: { _id: "$site", somme: { $sum: "$scoreSante" }, n: { $sum: 1 } } }
+//      ])
 // ---------------------------------------------------------------------
 
 function pipelineR3() {
@@ -76,6 +93,9 @@ function ligneR3(r) {
 //      Le tag est dans un TABLEAU. Un index sur un tableau ne se
 //      comporte pas tout a fait comme un index sur un champ — mais il
 //      existe, et il n'y en a pas.
+//
+//      En clair, dans make tortues-mongo :
+//      db.tortues.find({ tags: "migration-longue" })
 // ---------------------------------------------------------------------
 
 function filtreR4() { return { tags: PARAM.tag }; }

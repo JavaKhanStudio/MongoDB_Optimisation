@@ -31,6 +31,9 @@ const PARAM = {
 //      Une egalite sur un champ, et rien d'autre. C'est la requete que
 //      SQL servait sans qu'on y pense : la cle etrangere y portait un
 //      index, offert avec la contrainte.
+//
+//      En clair, dans make dune-mongo :
+//      db.collectes.find({ contremaitre: "Gurney Halleck" })
 // ---------------------------------------------------------------------
 
 function filtreR1() { return { contremaitre: PARAM.contremaitre }; }
@@ -40,9 +43,17 @@ function ligneR1(c) {
 }
 
 // ---------------------------------------------------------------------
-// R2 — « Les echecs du puits HAB-02, du plus recent au plus ancien. »
+// R2 — « Les echecs du puits HAB-02 en juillet 2026, du plus recent au
+//      plus ancien. »
 //      Une egalite, un intervalle, un tri. Trois choses, et l'ordre dans
 //      lequel on les met dans un index n'est pas indifferent.
+//
+//      En clair, dans make dune-mongo :
+//      db.collectes.find({
+//        puits: "HAB-02",
+//        statut: "ECHOUEE",
+//        debut: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") }
+//      }).sort({ debut: -1 })
 // ---------------------------------------------------------------------
 
 function filtreR2() {
@@ -60,6 +71,15 @@ function ligneR2(c) {
 //      La region n'est PAS dans la collecte : elle est dans le puits. Il
 //      faut donc aller la chercher — pour les 37 500 collectes — avant
 //      de pouvoir jeter celles qui ne sont pas de cette region.
+//
+//      En clair, dans make dune-mongo :
+//      db.collectes.aggregate([
+//        { $match: { statut: "REUSSIE",
+//                    debut: { $gte: ISODate("2026-07-01"), $lt: ISODate("2026-08-01") } } },
+//        { $lookup: { from: "puits", localField: "puits", foreignField: "_id", as: "p" } },
+//        { $match: { "p.region": "Erg Habbanya" } },
+//        { $group: { _id: "$puits", tonnes: { $sum: "$tonnes" }, n: { $sum: 1 } } }
+//      ])
 // ---------------------------------------------------------------------
 
 function pipelineR3() {
@@ -78,6 +98,9 @@ function ligneR3(r) {
 // R4 — « Les dix plus fortes secousses relevees au puits MUR-01. »
 //      Dix lignes en sortie. Le serveur, lui, trie les 1 027 releves du
 //      puits — et, pour les trouver, lit les 62 500.
+//
+//      En clair, dans make dune-mongo :
+//      db.releves.find({ puits: "MUR-01" }).sort({ amplitude: -1, mesureLe: -1 }).limit(10)
 // ---------------------------------------------------------------------
 
 function filtreR4() { return { puits: PARAM.puitsPics }; }
