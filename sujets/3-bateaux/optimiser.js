@@ -7,13 +7,13 @@
 //       est refait a chaque passage, jamais recopie ;
 //    2. elle pose les index, ecrit la reference etendue et le champ
 //       calcule ;
-//    3. elle remesure, verifie que les quatre reponses n'ont pas bouge,
+//    3. elle remesure, verifie que les sept reponses n'ont pas bouge,
 //       et met les deux tableaux cote a cote.
 //
-//  Ce sujet est celui ou l'on ECRIT le plus : deux des quatre requetes
-//  ne se reglent pas avec un index, parce qu'il n'y a rien a indexer.
-//  L'une cherche un champ qui est dans une AUTRE collection (R3), l'autre
-//  cherche un nombre qui n'est ECRIT NULLE PART (R4).
+//  R1 a R4 ne changent pas d'un caractere. R5 a R7 sont REECRITES :
+//    R5  le pavillon est dans une AUTRE collection -> reference etendue
+//    R6  la date est la, cachee dans une fonction   -> un intervalle
+//    R7  le tonnage n'est ECRIT NULLE PART          -> champ calcule
 // =====================================================================
 
 load("/projet/sujets/outils.js");
@@ -49,8 +49,31 @@ titre("R2 — egalite, intervalle, tri : E-S-R");
 base.escales.createIndex({ port: 1, arrivee: 1 }, { name: "port-arrivee" });
 dire("escales { port: 1, arrivee: 1 }");
 
-titre("R3 — la reference etendue : le champ est dans l autre collection");
-// R3 filtre sur le PAVILLON. L'escale ne le connait pas : elle connait
+titre("R3 — un index multicle sur un tableau de sous-documents");
+// La marchandise est dans cargaisons, un TABLEAU de sous-documents. Un
+// index sur "cargaisons.marchandise" est multicle : une escale a trois
+// cargaisons y met trois cles, une par marchandise. Il se pose comme un
+// autre, et l'arrivee vient en seconde cle — egalite, puis intervalle.
+//
+// Deux cargaisons de GNL dans la meme escale ne font qu'UNE cle pour ce
+// couple : le serveur ne rend pas l'escale deux fois, il deduplique.
+base.escales.createIndex({ "cargaisons.marchandise": 1, arrivee: 1 },
+                         { name: "marchandise-arrivee" });
+dire("escales { \"cargaisons.marchandise\": 1, arrivee: 1 }  (multicle)");
+
+titre("R4 — un index qui sert un tri, sans aucun filtre");
+// Vingt lignes, et le serveur trie les 94 500 escales pour les trouver.
+// Un index sur arrivee les a DEJA rangees : le serveur le lit par la fin,
+// prend vingt cles, et s'arrete. Croissant ou decroissant, peu importe
+// avec une seule cle de tri — un index se lit dans les deux sens.
+//
+// L'index de R2 ne sert pas : { port, arrivee } range les dates port par
+// port, pas toutes ensemble.
+base.escales.createIndex({ arrivee: 1 }, { name: "arrivee" });
+dire("escales { arrivee: 1 }");
+
+titre("R5 — la reference etendue : le champ est dans l autre collection");
+// R5 filtre sur le PAVILLON. L'escale ne le connait pas : elle connait
 // l'imo, et c'est le bateau qui porte le pavillon. Aucun index sur
 // escales ne peut servir ce filtre — il n'y a rien a indexer.
 //
@@ -79,7 +102,17 @@ dire("escales { pavillon: 1, arrivee: 1 }");
 base.optimisations.insertOne({ collection: "escales", champ: "pavillon",
                                vient_de: "bateaux.pavillon" });
 
-titre("R4 — le champ calcule : on n indexe pas une somme");
+titre("R6 — la date est la, mais cachee dans une fonction");
+// R6 filtre sur $year(arrivee) et $month(arrivee). L'index de R2,
+// { port: 1, arrivee: 1 }, sert deja le port. Mais la date, le serveur
+// ne peut pas la chercher : l'index range des dates, pas des annees ni
+// des mois. Il ouvre donc chaque escale du Havre et calcule.
+//
+// Aucun index de plus : c'est la REQUETE qui change. Aout 2024, c'est
+// l'intervalle du 1er aout inclus au 1er septembre exclu.
+dire("rien a poser : { port: 1, arrivee: 1 } est deja la, depuis R2");
+
+titre("R7 — le champ calcule : on n indexe pas une somme");
 // Le tonnage d'une escale est la somme de ses cargaisons. Il n'existe
 // nulle part : il se recalcule a chaque passage, pour les 94 500
 // escales, avant qu'on puisse en garder dix. Aucun index ne peut aider —
@@ -87,8 +120,12 @@ titre("R4 — le champ calcule : on n indexe pas une somme");
 //
 // Alors on l'ecrit. Ce n'est plus une reference etendue (rien n'est
 // copie d'ailleurs) : c'est un CHAMP CALCULE, et la regle est la meme —
-// il faut le recalculer a chaque fois qu'une cargaison bouge. Ici, une
-// cargaison ne bouge pas : l'escale est un journal, on l'ecrit une fois.
+// il faut le recalculer a chaque fois qu'une cargaison bouge. Ajouter
+// une cargaison, c'est donc DEUX changements dans la meme ecriture :
+//     db.escales.updateOne({ _id: 35 },
+//       { $push: { cargaisons: { marchandise: "...", tonnes: 90000 } },
+//         $inc:  { tonnesTotal: 90000 } })
+// Un $push seul, et R7 rend un classement faux sans rien dire.
 const t1 = Date.now();
 base.escales.updateMany({}, [{ $set: { tonnesTotal: { $sum: "$cargaisons.tonnes" } } }]);
 dire("tonnesTotal calcule dans les escales en " + n(Date.now() - t1) + " ms");
@@ -99,20 +136,27 @@ base.optimisations.insertOne({ collection: "escales", champ: "tonnesTotal",
                                vient_de: "somme de cargaisons.tonnes" });
 
 // =====================================================================
-//  R3 et R4, reecrites — les deux dont le TEXTE change
+//  R5, R6 et R7, reecrites — les trois dont le TEXTE change
 // =====================================================================
 
-function pipelineR3Optimise() {
+function pipelineR5Optimise() {
   return [
     { $match: { pavillon: PARAM.pavillon,
                 arrivee: { $gte: PARAM.recDebut, $lt: PARAM.recFin } } },
-    { $group: { _id: "$port", tonnes: { $sum: "$tonnesTotal" }, n: { $sum: 1 } } }
+    { $group: { _id: "$port", tonnes: { $sum: { $sum: "$cargaisons.tonnes" } }, n: { $sum: 1 } } }
   ];
 }
+
+function filtreR6Optimise() {
+  return { port: PARAM.portMois,
+           arrivee: { $gte: new Date(Date.UTC(PARAM.annee, PARAM.mois - 1, 1)),
+                      $lt:  new Date(Date.UTC(PARAM.annee, PARAM.mois, 1)) } };
+}
+
 // Le tri et la limite se servent directement dans l'index : dix cles
 // lues, dix documents ouverts, et on s'arrete. Plus de $set sur 94 500
 // documents, plus de tri en memoire.
-function pipelineR4Optimise() {
+function pipelineR7Optimise() {
   return [
     { $sort:  { tonnesTotal: -1, _id: 1 } },
     { $limit: 10 },
@@ -120,17 +164,18 @@ function pipelineR4Optimise() {
   ];
 }
 
-const REQUETES_OPTIMISEES = REQUETES.map(r => {
-  if (r.code === "R3") return { code: "R3", intitule: r.intitule,
-    jouer:     b => b.escales.aggregate(pipelineR3Optimise()).toArray().map(ligneR3).sort(),
-    expliquer: b => b.escales.explain("executionStats").aggregate(pipelineR3Optimise()) };
-  if (r.code === "R4") return { code: "R4", intitule: r.intitule,
-    jouer:     b => b.escales.aggregate(pipelineR4Optimise()).toArray().map(ligneR4).sort(),
-    expliquer: b => b.escales.explain("executionStats").aggregate(pipelineR4Optimise()) };
-  return r;
-});
+const REECRITES = {
+  R5: { jouer:     b => b.escales.aggregate(pipelineR5Optimise()).toArray().map(ligneR5).sort(),
+        expliquer: b => b.escales.explain("executionStats").aggregate(pipelineR5Optimise()) },
+  R6: { jouer:     b => b.escales.find(filtreR6Optimise()).toArray().map(ligneR6).sort(),
+        expliquer: b => b.escales.find(filtreR6Optimise()).explain("executionStats") },
+  R7: { jouer:     b => b.escales.aggregate(pipelineR7Optimise()).toArray().map(ligneR7).sort(),
+        expliquer: b => b.escales.explain("executionStats").aggregate(pipelineR7Optimise()) }
+};
+const REQUETES_OPTIMISEES = REQUETES.map(r => !REECRITES[r.code] ? r
+  : Object.assign({ code: r.code, intitule: r.intitule }, REECRITES[r.code]));
 
-titre("Les memes quatre questions, sur la base optimisee");
+titre("Les memes sept questions, sur la base optimisee");
 const apres = banc(base, REQUETES_OPTIMISEES);
 
 titre("La reponse n a pas change ?");

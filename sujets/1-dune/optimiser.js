@@ -8,13 +8,14 @@
 //       copie — et MESURE. C'est le « avant », et il est refait a chaque
 //       passage : jamais un chiffre recopie ;
 //    2. elle pose ce qu'il faut poser, et ecrit ce qu'il faut recopier ;
-//    3. elle remesure, verifie que les quatre reponses n'ont pas bouge,
+//    3. elle remesure, verifie que les sept reponses n'ont pas bouge,
 //       et met les deux tableaux cote a cote.
 //
-//  TROIS DES QUATRE requetes ne changent pas d'un caractere : seul leur
-//  chemin change. La quatrieme, R3, est REECRITE — et c'est la toute la
-//  lecon de la reference etendue : on ne peut pas indexer un champ que
-//  le document n'a pas.
+//  R1 a R4 ne changent pas d'un caractere : seul leur chemin change.
+//  R5 a R7 sont REECRITES, et chacune pour une raison differente :
+//    R5  le champ filtre n'est pas dans le document  -> reference etendue
+//    R6  le champ y est, mais cache dans une fonction -> un intervalle
+//    R7  la valeur n'est ecrite nulle part            -> champ calcule
 // =====================================================================
 
 load("/projet/sujets/outils.js");
@@ -32,9 +33,9 @@ for (const c of base.getCollectionNames()) {
   for (const ix of base.getCollection(c).getIndexes())
     if (ix.name !== "_id_") base.getCollection(c).dropIndex(ix.name);
 }
-base.collectes.updateMany({}, { $unset: { region: "" } });
+base.collectes.updateMany({}, { $unset: { region: "", rendement: "" } });
 base.optimisations.drop();
-dire("aucun index, aucune copie.");
+dire("aucun index, aucune copie, aucun champ calcule.");
 
 const avant = banc(base, REQUETES);
 
@@ -69,8 +70,36 @@ base.collectes.createIndex({ puits: 1, statut: 1, debut: 1 },
                            { name: "puits-statut-debut" });
 dire("collectes { puits: 1, statut: 1, debut: 1 }");
 
-titre("R3 — la reference etendue : on ne peut pas indexer ce qu on n a pas");
-// R3 demande les collectes D UNE REGION. Or la collecte ne sait pas dans
+titre("R3 — un champ dans un sous-document, absent de la plupart");
+// Le ver n'existe que dans une collecte ECHOUEE, et seulement quand c'est
+// lui qui l'a fait echouer. Un index se pose sur "ver.nom" exactement
+// comme sur un champ du premier niveau : le point descend dans le
+// sous-document, et c'est tout.
+//
+// Ce que l'index range pour les collectes SANS ver : une cle null, une
+// par document. Elles sont les trois quarts, et elles ne servent a rien
+// a R3. { sparse: true } les laisserait dehors — un index plus petit,
+// mais que le serveur refuse pour toute requete qui chercherait les
+// collectes sans ver ({ "ver.nom": null }). On le laisse ordinaire.
+base.collectes.createIndex({ "ver.nom": 1 }, { name: "ver-nom" });
+dire("collectes { \"ver.nom\": 1 }");
+
+titre("R4 — le tri bloquant : dix lignes, 1 027 documents tries");
+// Dix lignes en sortie, et pourtant le serveur lit les 62 500 releves,
+// garde les 1 027 du puits, les trie en memoire, et jette 1 017. L'etage
+// TRI du plan, c'est ca : il ne peut rien rendre avant d'avoir tout vu.
+//
+// Un index qui porte DEJA les releves du puits dans l'ordre des
+// amplitudes decroissantes supprime le tri : le serveur suit l'index,
+// prend les dix premieres cles, et s'arrete. Ici la direction compte :
+// il y a deux cles de tri, et elles doivent aller dans le meme sens que
+// l'index (ou toutes les deux dans l'autre sens).
+base.releves.createIndex({ puits: 1, amplitude: -1, mesureLe: -1 },
+                         { name: "puits-amplitude-mesure" });
+dire("releves { puits: 1, amplitude: -1, mesureLe: -1 }");
+
+titre("R5 — la reference etendue : on ne peut pas indexer ce qu on n a pas");
+// R5 demande les collectes D UNE REGION. Or la collecte ne sait pas dans
 // quelle region elle est : elle connait son puits, et c'est le puits qui
 // connait la region. Aucun index sur collectes ne peut donc servir ce
 // filtre — il n'y a rien a indexer.
@@ -109,25 +138,51 @@ dire("collectes { region: 1, statut: 1, debut: 1 }");
 base.optimisations.insertOne({ collection: "collectes", champ: "region",
                                vient_de: "puits.region" });
 
-titre("R4 — le tri bloquant : dix lignes, 62 500 documents tries");
-// Dix lignes en sortie, et pourtant le serveur lit les 62 500 releves,
-// garde les 1 027 du puits, les trie en memoire, et jette 1 017. L'etage
-// TRI du plan, c'est ca : il ne peut rien rendre avant d'avoir tout vu.
+titre("R6 — le champ est la, mais cache dans une fonction");
+// R6 filtre sur $year(debut) et $month(debut). Un index sur debut range
+// des DATES, pas des annees ni des mois : le serveur ne peut pas y
+// chercher « 2025 » ni « 12 ». Il se sert de l'index pour le puits, puis
+// ouvre chaque collecte du puits et calcule son annee et son mois.
 //
-// Un index qui porte DEJA les releves du puits dans l'ordre des
-// amplitudes decroissantes supprime le tri : le serveur suit l'index,
-// prend les dix premieres cles, et s'arrete. Ici la direction compte :
-// il y a deux cles de tri, et elles doivent aller dans le meme sens que
-// l'index (ou toutes les deux dans l'autre sens).
-base.releves.createIndex({ puits: 1, amplitude: -1, mesureLe: -1 },
-                         { name: "puits-amplitude-mesure" });
-dire("releves { puits: 1, amplitude: -1, mesureLe: -1 }");
+// La meme question s'ecrit comme un INTERVALLE sur la date elle-meme :
+// du 1er decembre 2025 inclus au 1er janvier 2026 exclu. Meme reponse,
+// et cette fois les deux cles de l'index servent. E-S-R, encore : le
+// puits est l'egalite, la date l'intervalle.
+//
+// Pourquoi pas l'index de R2 ? { puits, statut, debut } : R6 ne dit rien
+// du statut, et sans lui la date n'est plus rangee dans l'index — elle
+// l'est statut par statut.
+base.collectes.createIndex({ puits: 1, debut: 1 }, { name: "puits-debut" });
+dire("collectes { puits: 1, debut: 1 }");
+
+titre("R7 — le champ calcule : on n indexe pas une division");
+// Le rendement, c'est tonnes / dureeMinutes. Il n'est ecrit nulle part :
+// R7 le recalcule pour les 27 000 collectes reussies, les trie toutes en
+// memoire, et en garde dix. Un index sur tonnes ne sert a rien — l'ordre
+// des tonnes n'est pas celui du rendement.
+//
+// Alors on l'ecrit, dans les seules collectes reussies (une collecte
+// echouee n'a pas de tonnes). C'est un CHAMP CALCULE : rien n'est copie
+// d'ailleurs, mais la regle est celle de la copie — le jour ou tonnes ou
+// dureeMinutes change, le rendement doit etre reecrit dans la meme
+// ecriture, sinon il ment.
+const t1 = Date.now();
+base.collectes.updateMany({ statut: "REUSSIE" },
+  [{ $set: { rendement: { $divide: ["$tonnes", "$dureeMinutes"] } } }]);
+dire("rendement calcule dans les collectes en " + n(Date.now() - t1) + " ms");
+
+// _id en seconde cle : c'est le second critere du tri de R7. Sans lui,
+// deux rendements egaux laisseraient le serveur trier en memoire.
+base.collectes.createIndex({ rendement: -1, _id: 1 }, { name: "rendement" });
+dire("collectes { rendement: -1, _id: 1 }");
+base.optimisations.insertOne({ collection: "collectes", champ: "rendement",
+                               vient_de: "tonnes / dureeMinutes" });
 
 // =====================================================================
-//  3. R3, reecrite — la seule des quatre dont le TEXTE change
+//  3. R5, R6 et R7, reecrites — les trois dont le TEXTE change
 // =====================================================================
 
-function pipelineR3Optimise() {
+function pipelineR5Optimise() {
   return [
     { $match: { region: PARAM.region, statut: "REUSSIE",
                 debut: { $gte: PARAM.moisDebut, $lt: PARAM.moisFin } } },
@@ -135,13 +190,36 @@ function pipelineR3Optimise() {
   ];
 }
 
-const REQUETES_OPTIMISEES = REQUETES.map(r => r.code !== "R3" ? r : {
-  code: "R3", intitule: r.intitule,
-  jouer:     b => b.collectes.aggregate(pipelineR3Optimise()).toArray().map(ligneR3).sort(),
-  expliquer: b => b.collectes.explain("executionStats").aggregate(pipelineR3Optimise())
-});
+// Le mois, ecrit comme un intervalle de dates : ce que l'index sait lire.
+function filtreR6Optimise() {
+  return { puits: PARAM.puitsMois,
+           debut: { $gte: new Date(Date.UTC(PARAM.annee, PARAM.mois - 1, 1)),
+                    $lt:  new Date(Date.UTC(PARAM.annee, PARAM.mois, 1)) } };
+}
 
-titre("Les memes quatre questions, sur la base optimisee");
+// Plus de $match sur le statut : seules les collectes reussies portent
+// un rendement, et les autres se rangent en queue de l'index. Plus de
+// $set, plus de tri en memoire : le serveur suit l'index et s'arrete a
+// la dixieme cle.
+function pipelineR7Optimise() {
+  return [
+    { $sort:  { rendement: -1, _id: 1 } },
+    { $limit: 10 }
+  ];
+}
+
+const REECRITES = {
+  R5: { jouer:     b => b.collectes.aggregate(pipelineR5Optimise()).toArray().map(ligneR5).sort(),
+        expliquer: b => b.collectes.explain("executionStats").aggregate(pipelineR5Optimise()) },
+  R6: { jouer:     b => b.collectes.find(filtreR6Optimise()).toArray().map(ligneR6).sort(),
+        expliquer: b => b.collectes.find(filtreR6Optimise()).explain("executionStats") },
+  R7: { jouer:     b => b.collectes.aggregate(pipelineR7Optimise()).toArray().map(ligneR7).sort(),
+        expliquer: b => b.collectes.explain("executionStats").aggregate(pipelineR7Optimise()) }
+};
+const REQUETES_OPTIMISEES = REQUETES.map(r => !REECRITES[r.code] ? r
+  : Object.assign({ code: r.code, intitule: r.intitule }, REECRITES[r.code]));
+
+titre("Les memes sept questions, sur la base optimisee");
 const apres = banc(base, REQUETES_OPTIMISEES);
 
 titre("La reponse n a pas change ?");

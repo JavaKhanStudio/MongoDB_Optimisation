@@ -5,9 +5,14 @@
 //
 //    1. elle remet la base comme au chargement et MESURE — le « avant »
 //       est refait a chaque passage, jamais recopie ;
-//    2. elle pose les index et ecrit la reference etendue ;
-//    3. elle remesure, verifie que les quatre reponses n'ont pas bouge,
+//    2. elle pose les index, ecrit la reference etendue et le compteur ;
+//    3. elle remesure, verifie que les sept reponses n'ont pas bouge,
 //       et met les deux tableaux cote a cote.
+//
+//  R1 a R4 ne changent pas d'un caractere. R5 a R7 sont REECRITES :
+//    R5  le statut n'est pas dans l'observation  -> reference etendue
+//    R6  la date y est, cachee dans une fonction  -> un intervalle
+//    R7  le compte n'est ecrit nulle part         -> un compteur
 // =====================================================================
 
 load("/projet/sujets/outils.js");
@@ -22,8 +27,9 @@ for (const c of base.getCollectionNames()) {
     if (ix.name !== "_id_") base.getCollection(c).dropIndex(ix.name);
 }
 base.observations.updateMany({}, { $unset: { statutUicn: "" } });
+base.tortues.updateMany({}, { $unset: { nbObservations: "" } });
 base.optimisations.drop();
-dire("aucun index, aucune copie.");
+dire("aucun index, aucune copie, aucun compteur.");
 
 const avant = banc(base, REQUETES);
 
@@ -44,8 +50,30 @@ titre("R2 — egalite puis intervalle, dans cet ordre");
 base.observations.createIndex({ site: 1, date: 1 }, { name: "site-date" });
 dire("observations { site: 1, date: 1 }");
 
-titre("R3 — la reference etendue, et le prix d une copie de copie");
-// R3 filtre sur le statut UICN. Une observation ne le connait pas : elle
+titre("R3 — un intervalle dans un sous-document");
+// Le poids est range dans mensurations. L'index se pose sur le chemin,
+// point compris, et sert un intervalle comme il sert une egalite : le
+// serveur se place sur la premiere cle >= 410 et lit jusqu'au bout.
+base.tortues.createIndex({ "mensurations.poidsKg": 1 }, { name: "poids" });
+dire("tortues { \"mensurations.poidsKg\": 1 }");
+
+titre("R4 — un index sur un tableau : multicle");
+// tags est un tableau. MongoDB indexe alors CHAQUE element separement :
+// une tortue a quatre tags produit quatre cles. L'index s'appelle
+// multicle, il se pose exactement comme un autre, et il se paie a
+// l'ecriture — quatre cles a tenir a jour au lieu d'une.
+base.tortues.createIndex({ tags: 1 }, { name: "tags" });
+dire("tortues { tags: 1 }  (multicle)");
+// Et c'est la requete qui gagne le MOINS des sept — sept fois, quand
+// les autres gagnent de quarante a des milliers de fois. Ce n'est pas
+// un rate : 1 344 tortues sur 10 000 portent ce tag. Un index ne paie que ce qu'il ecarte, et
+// celui-ci n'ecarte que huit documents sur dix. Le chiffre qui decide
+// s'appelle la SELECTIVITE, et on le regarde avant de poser l'index :
+//     db.tortues.distinct("tags").length   contre   10 000 documents.
+// Sur un champ a deux valeurs, l'index coute plus qu'il ne rapporte.
+
+titre("R5 — la reference etendue, et le prix d une copie de copie");
+// R5 filtre sur le statut UICN. Une observation ne le connait pas : elle
 // connait sa tortue, la tortue connait son espece, et c'est l'espece qui
 // porte le statut. Il est deja RECOPIE dans la tortue depuis « SQL vers
 // NoSQL » — la copie qu'on ajoute ici est donc une copie de copie.
@@ -54,7 +82,7 @@ titre("R3 — la reference etendue, et le prix d une copie de copie");
 // reclasse une espece, il y a maintenant TROIS endroits a reecrire —
 // especes, tortues, observations — et ils ne le seront pas au meme
 // instant. On accepte ca parce qu'une reclassification arrive tous les
-// dix ans et que R3 est posee tous les jours.
+// dix ans et que R5 est posee tous les jours.
 //
 // En une passe, et $merge repose le resultat la d'ou il sort. Le lookup
 // qu'on refusait de payer a chaque lecture est paye une seule fois.
@@ -72,26 +100,50 @@ dire("observations { statutUicn: 1, date: 1 }");
 base.optimisations.insertOne({ collection: "observations", champ: "statutUicn",
                                vient_de: "tortues.espece.statutUicn" });
 
-titre("R4 — un index sur un tableau : multicle");
-// tags est un tableau. MongoDB indexe alors CHAQUE element separement :
-// une tortue a quatre tags produit quatre cles. L'index s'appelle
-// multicle, il se pose exactement comme un autre, et il se paie a
-// l'ecriture — quatre cles a tenir a jour au lieu d'une.
-base.tortues.createIndex({ tags: 1 }, { name: "tags" });
-dire("tortues { tags: 1 }  (multicle)");
-// Et c'est la requete qui gagne le MOINS des quatre — sept fois, quand
-// les autres gagnent cent fois. Ce n'est pas un rate : 1 344 tortues sur
-// 10 000 portent ce tag. Un index ne paie que ce qu'il ecarte, et
-// celui-ci n'ecarte que huit documents sur dix. Le chiffre qui decide
-// s'appelle la SELECTIVITE, et on le regarde avant de poser l'index :
-//     db.tortues.distinct("tags").length   contre   10 000 documents.
-// Sur un champ a deux valeurs, l'index coute plus qu'il ne rapporte.
+titre("R6 — la date est la, mais cachee dans une fonction");
+// R6 filtre sur $year(date) et $month(date). L'index de R2,
+// { site: 1, date: 1 }, sert deja le site : le serveur y va droit. Mais
+// la date, il ne peut pas la chercher : l'index range des dates, pas des
+// annees ni des mois. Il ouvre donc chaque observation du site et
+// calcule.
+//
+// Aucun index de plus : c'est la REQUETE qui change. Mars 2024, c'est
+// l'intervalle du 1er mars inclus au 1er avril exclu, et cet intervalle,
+// la seconde cle de l'index sait le lire.
+dire("rien a poser : { site: 1, date: 1 } est deja la, depuis R2");
+
+titre("R7 — le compteur : on n indexe pas un $group");
+// Les dix tortues les plus observees : le serveur recompte les 90 000
+// observations, les groupe, trie les 10 000 comptes, en garde dix.
+// Aucun index ne range un nombre que personne n'a ecrit.
+//
+// Alors on l'ecrit, dans la tortue : nbObservations. C'est un COMPTEUR,
+// un champ calcule qui bouge a CHAQUE observation ajoutee. Le prix est la,
+// tout entier : l'ajout d'une observation devient deux ecritures,
+//     db.observations.insertOne({ ... tortue: 914 ... })
+//     db.tortues.updateOne({ _id: 914 }, { $inc: { nbObservations: 1 } })
+// et si la seconde est oubliee, R7 ment sans rien dire.
+//
+// $merge ecrit le compte dans la tortue sans toucher au reste du document
+// (whenMatched: "merge"). Une tortue jamais observee n'a pas de compteur :
+// elle se range en queue de l'index, la ou R7 ne va jamais.
+const t1 = Date.now();
+base.observations.aggregate([
+  { $group: { _id: "$tortue", nbObservations: { $sum: 1 } } },
+  { $merge: { into: "tortues", on: "_id", whenMatched: "merge", whenNotMatched: "discard" } }
+]).toArray();
+dire("nbObservations compte dans les tortues en " + n(Date.now() - t1) + " ms");
+
+base.tortues.createIndex({ nbObservations: -1, _id: 1 }, { name: "nbObservations" });
+dire("tortues { nbObservations: -1, _id: 1 }");
+base.optimisations.insertOne({ collection: "tortues", champ: "nbObservations",
+                               vient_de: "compte des observations" });
 
 // =====================================================================
-//  R3, reecrite — la seule des quatre dont le TEXTE change
+//  R5, R6 et R7, reecrites — les trois dont le TEXTE change
 // =====================================================================
 
-function pipelineR3Optimise() {
+function pipelineR5Optimise() {
   return [
     { $match: { statutUicn: PARAM.statutUicn,
                 date: { $gte: PARAM.moisDebut, $lt: PARAM.moisFin } } },
@@ -99,13 +151,35 @@ function pipelineR3Optimise() {
   ];
 }
 
-const REQUETES_OPTIMISEES = REQUETES.map(r => r.code !== "R3" ? r : {
-  code: "R3", intitule: r.intitule,
-  jouer:     b => b.observations.aggregate(pipelineR3Optimise()).toArray().map(ligneR3).sort(),
-  expliquer: b => b.observations.explain("executionStats").aggregate(pipelineR3Optimise())
-});
+function filtreR6Optimise() {
+  return { site: PARAM.siteMois,
+           date: { $gte: new Date(Date.UTC(PARAM.annee, PARAM.mois - 1, 1)),
+                   $lt:  new Date(Date.UTC(PARAM.annee, PARAM.mois, 1)) } };
+}
 
-titre("Les memes quatre questions, sur la base optimisee");
+// La projection ne demande QUE des champs de l'index (_id et
+// nbObservations) : le serveur n'ouvre pas une seule tortue. Dix cles
+// lues, zero document — la requete est couverte.
+function pipelineR7Optimise() {
+  return [
+    { $sort:    { nbObservations: -1, _id: 1 } },
+    { $limit:   10 },
+    { $project: { _id: 1, n: "$nbObservations" } }
+  ];
+}
+
+const REECRITES = {
+  R5: { jouer:     b => b.observations.aggregate(pipelineR5Optimise()).toArray().map(ligneR5).sort(),
+        expliquer: b => b.observations.explain("executionStats").aggregate(pipelineR5Optimise()) },
+  R6: { jouer:     b => b.observations.find(filtreR6Optimise()).toArray().map(ligneR6).sort(),
+        expliquer: b => b.observations.find(filtreR6Optimise()).explain("executionStats") },
+  R7: { jouer:     b => b.tortues.aggregate(pipelineR7Optimise()).toArray().map(ligneR7).sort(),
+        expliquer: b => b.tortues.explain("executionStats").aggregate(pipelineR7Optimise()) }
+};
+const REQUETES_OPTIMISEES = REQUETES.map(r => !REECRITES[r.code] ? r
+  : Object.assign({ code: r.code, intitule: r.intitule }, REECRITES[r.code]));
+
+titre("Les memes sept questions, sur la base optimisee");
 const apres = banc(base, REQUETES_OPTIMISEES);
 
 titre("La reponse n a pas change ?");
