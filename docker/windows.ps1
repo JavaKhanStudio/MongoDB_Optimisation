@@ -158,10 +158,13 @@ function Jouer([string]$Cible) {
 $Cibles = @()
 foreach ($a in $args) {
     if ($a -match '^([A-Za-z]+)=(.*)$') {
+        # Garder les deux morceaux AVANT le test suivant : un -match reussi
+        # remplace $Matches, et VOLUME=10 aurait charge VOLUME vide.
         $nom = $Matches[1].ToUpper()
+        $val = $Matches[2]
         if (-not $Reglages.ContainsKey($nom)) { Write-Host "  Reglage inconnu : $nom (VOLUME ou GRAINE)"; exit 2 }
-        if ($Matches[2] -notmatch '^\d+$')    { Write-Host "  $nom doit etre un nombre entier : $($Matches[2])"; exit 2 }
-        $Reglages[$nom] = $Matches[2]
+        if ($val -notmatch '^\d+$')           { Write-Host "  $nom doit etre un nombre entier : $val"; exit 2 }
+        $Reglages[$nom] = $val
     } else {
         $Cibles += $a
     }
