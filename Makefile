@@ -4,6 +4,8 @@
 # =====================================================================
 # Sous Podman rootless (Fedora), avant tout :
 #   export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+# Sous Windows, make.cmd joue les memes cibles (docker/windows.ps1) :
+# une cible qui change ici change la-bas aussi.
 
 COMPOSE = docker compose -f docker/docker-compose.yml
 MONGOSH = docker exec -it optimisation-mongo mongosh --quiet

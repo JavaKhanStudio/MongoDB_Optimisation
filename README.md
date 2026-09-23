@@ -37,7 +37,30 @@ make dune-mesurer
 Sous Podman rootless (Fedora) :
 `export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock` avant `make`.
 
-`make aide` liste tout.
+`make aide` liste tout. Sous Windows, voir [la section suivante](#sous-windows).
+
+---
+
+## Sous Windows
+
+Pas besoin de `make`, ni de WSL. Il faut **Docker Desktop**, installé et lancé,
+et **Git**. Dans PowerShell :
+
+```powershell
+git clone https://github.com/JavaKhanStudio/MongoDB_Optimisation.git
+cd MongoDB_Optimisation
+.\make demarrer
+.\make dune
+.\make dune-mesurer
+```
+
+`.\make` remplace `make` dans **toutes** les commandes de ce README, réglages
+compris : `.\make dune VOLUME=10`, `.\make aide`. Dans l'invite de commandes
+(`cmd`), `make dune` suffit.
+
+C'est `make.cmd`, à la racine, qui lance `docker/windows.ps1` : les mêmes
+commandes `docker` que le `Makefile`, cible pour cible. Il passe outre la
+politique d'exécution de PowerShell, qu'on n'a donc pas à toucher.
 
 ---
 
@@ -172,6 +195,8 @@ docker/docker-compose.yml   mongo:8.0 (27051), depot monte en /projet.
                             les chiffres des SUJET.md ne seraient pas les memes
                             d'un poste a l'autre.
 Makefile                    make aide
+make.cmd                    le meme, sous Windows : .\make aide
+docker/windows.ps1          ce que make.cmd lance, cible pour cible
 sujets/SUJETS.txt           la page que `make sujets` affiche
 sujets/outils.js            le tirage reproductible, la mise en forme, et LE
                             BANC DE MESURE
