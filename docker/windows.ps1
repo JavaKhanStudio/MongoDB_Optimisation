@@ -48,7 +48,7 @@ function Aide {
   Un sujet   (<s> = dune | tortues | bateaux)
     .\make <s>               - (re)fabrique la base et la remplit.
                                VOLUME=10 pour dix fois plus de donnees.
-    .\make <s>-mesurer       - joue les quatre requetes du sujet et dit,
+    .\make <s>-mesurer       - joue les sept requetes du sujet et dit,
                                pour chacune, combien de documents le
                                serveur a lus pour rendre combien de lignes
     .\make <s>-mongo         - un mongosh sur la base du sujet

@@ -1,7 +1,8 @@
 # Optimisation d'une collection
 
 > Les trois modèles document écrits en « SQL vers NoSQL », remplis cette fois
-> de **300 000 documents**, et les requêtes qui vont avec. Le modèle est propre.
+> de **300 000 documents**, et sept requêtes par base qui vont avec : quatre
+> qu'un index suffit à régler, trois où il faut aussi changer la requête. Le modèle est propre.
 > Ce qui manque, ce sont les index — et les champs qui permettraient de ne pas
 > aller chercher ailleurs ce qu'on filtre. Accompagne la slide « Optimisation
 > d'une collection » du deck MongoDB.
@@ -68,9 +69,9 @@ politique d'exécution de PowerShell, qu'on n'a donc pas à toucher.
 
 | sujet | documents | ce qu'on y apprend |
 |---|---|---|
-| [`1-dune`](sujets/1-dune/SUJET.md) | 100 000 | l'index simple · l'ordre des clés d'un index composé · **la référence étendue** · le tri bloquant · *(exploration)* la requête couverte |
-| [`2-tortues`](sujets/2-tortues/SUJET.md) | 100 000 | la clé étrangère que SQL indexait tout seul · l'index **multiclé** sur un tableau · la copie de copie · la **sélectivité** · *(exploration)* `$elemMatch` et les bornes d'un index multiclé |
-| [`3-bateaux`](sujets/3-bateaux/SUJET.md) | 100 000 | deux requêtes sur quatre qu'**aucun index** ne peut servir · la référence étendue · le **champ calculé** · *(exploration)* l'index **partiel** |
+| [`1-dune`](sujets/1-dune/SUJET.md) | 100 000 | l'index simple · l'ordre des clés d'un index composé · l'index sur un champ de sous-document · le tri bloquant · **la référence étendue** · la fonction qui cache le champ à l'index · le **champ calculé** · *(exploration)* la requête couverte |
+| [`2-tortues`](sujets/2-tortues/SUJET.md) | 100 000 | la clé étrangère que SQL indexait tout seul · l'index **multiclé** sur un tableau · la **sélectivité** · la copie de copie · la fonction qui cache le champ à l'index · le **compteur** tenu à jour · *(exploration)* `$elemMatch` et les bornes d'un index multiclé |
+| [`3-bateaux`](sujets/3-bateaux/SUJET.md) | 100 000 | l'index multiclé sur un tableau de sous-documents · l'index qui sert un tri sans filtre · la référence étendue · la fonction qui cache le champ à l'index · le **champ calculé** · *(exploration)* l'index **partiel** |
 
 Les trois sont indépendants : n'importe quel ordre, et on peut s'arrêter après
 un seul. Ils partent des corrections de
@@ -97,9 +98,9 @@ make dune GRAINE=1234           # une autre base, tout aussi reproductible
 
 Même graine, même base, sur toutes les machines. Aucun dump à transporter, et
 `VOLUME=10` ne coûte rien à personne d'autre que la machine qui charge. À
-`VOLUME=10`, `make dune-mesurer` lit 1 761 402 documents pour rendre 1 670
-lignes — le rapport ne bouge pas (922 lus pour 1 rendu à `VOLUME=1`, 1 055 à
-`VOLUME=10`), c'est ce qu'il y a derrière qui grossit.
+`VOLUME=10`, `make dune-mesurer` lit 2 886 402 documents pour rendre 2 926
+lignes. Le rapport ne bouge presque pas (846 lus pour 1 rendu à `VOLUME=1`, 986
+à `VOLUME=10`) : c'est ce qu'il y a derrière qui grossit.
 
 Les chiffres des `SUJET.md` sont ceux de `VOLUME=1`, graine par défaut.
 
@@ -112,12 +113,12 @@ Les chiffres des `SUJET.md` sont ceux de `VOLUME=1`, graine par défaut.
 | commande | ce qu'elle donne |
 |---|---|
 | `make <sujet>` | jette la base et la refait. Rejouable autant qu'on veut. |
-| `make <sujet>-mesurer` | **le banc** : joue les quatre requêtes et dit, pour chacune, combien de documents le serveur a lus pour rendre combien de lignes |
+| `make <sujet>-mesurer` | **le banc** : joue les sept requêtes et dit, pour chacune, combien de documents le serveur a lus pour rendre combien de lignes |
 | `make <sujet>-mongo` | un `mongosh` sur la base |
 | `make <sujet>-remettre` | retire les index et les champs ajoutés, **sans recharger** : de quoi mesurer deux fois dans les mêmes conditions |
 | `make <sujet>-optimiser` | **la correction**, sur la branche `correction` — `git switch correction` d'abord. Elle remet la base à nu, mesure, pose les index, écrit les copies, remesure, et met les deux tableaux côte à côte |
 
-L'énoncé de chaque sujet est son `SUJET.md` : le modèle, ce que les quatre
+L'énoncé de chaque sujet est son `SUJET.md` : le modèle, ce que les sept
 requêtes coûtent aujourd'hui, et les exercices.
 
 ### Comment on mesure
@@ -141,7 +142,7 @@ seul, qu'`explain()` ne montre pas.
 ### La réponse ne change pas
 
 Optimiser, c'est changer le chemin sans changer la réponse. La réponse attendue
-des quatre requêtes est calculée **au chargement**, à part, à partir des données
+des sept requêtes est calculée **au chargement**, à part, à partir des données
 générées — *pas* en rejouant les requêtes du sujet. Le banc la recompare à chaque
 passage :
 
@@ -203,11 +204,11 @@ sujets/outils.js            le tirage reproductible, la mise en forme, et LE
 sujets/mesurer.js           make <sujet>-mesurer
 sujets/remettre.js          make <sujet>-remettre
 sujets/<n>-<sujet>/
-    SUJET.md                l'enonce : le modele, les quatre requetes en clair,
+    SUJET.md                l'enonce : le modele, les sept requetes en clair,
                             les chiffres, les exercices
     charger.js              fabrique les donnees, les charge, et calcule la
-                            reponse attendue des quatre requetes
-    requetes.js             LES QUATRE REQUETES — le fichier de l'etudiant
+                            reponse attendue des sept requetes
+    requetes.js             LES SEPT REQUETES : le fichier de l'etudiant
     optimiser.js            LA CORRECTION (branche correction)
 tools/verifier-en-clair.js  joue les requetes ecrites en clair (SUJET.md et
                             requetes.js) et verifie qu'elles rendent les
@@ -223,7 +224,7 @@ tools/verifier-en-clair.js  joue les requetes ecrites en clair (SUJET.md et
 | constat | où |
 |---|---|
 | `mongo:8.0` refuse de démarrer sur un noyau Linux ≥ 6.19 (SERVER-121912). Le contournement est `GLIBC_TUNABLES: glibc.pthread.rseq=1` dans l'environnement du service — le même que `MongoDB_ACID` et `MongoDB_SQLversNoSQL`. | `docker/docker-compose.yml` |
-| L'`explain` d'un `aggregate` éparpille `totalDocsExamined` dans l'arbre : sur R3 de `dune`, l'étage `$cursor` en annonce 37 500 et le `$lookup` 1 085, et seul le sommet porte la somme. Lire le mauvais nœud fait mentir la mesure d'un facteur qui dépend du plan. Les compteurs de `serverStatus().metrics.queryExecutor`, eux, donnent le même nombre quelle que soit la forme de la requête — c'est d'eux que sort la colonne `lus`. | `sujets/outils.js` |
+| L'`explain` d'un `aggregate` éparpille `totalDocsExamined` dans l'arbre : sur R5 de `dune`, l'étage `$cursor` en annonce 37 500 et le `$lookup` 1 085, et seul le sommet porte la somme. Lire le mauvais nœud fait mentir la mesure d'un facteur qui dépend du plan. Les compteurs de `serverStatus().metrics.queryExecutor`, eux, donnent le même nombre quelle que soit la forme de la requête — c'est d'eux que sort la colonne `lus`. | `sujets/outils.js` |
 | Un index dont la clé de tête est un **intervalle** sert quand même le tri et ne lit pas un document de trop — mais il lit **toutes les clés de l'intervalle** : 23 239 au lieu de 967 sur R2 de `bateaux`. La faute ne se voit que dans la colonne `cles`. | `sujets/3-bateaux/SUJET.md` |
 | `partialFilterExpression` n'accepte pas `$exists: false` : les index partiels du projet portent tous sur une égalité. | `sujets/3-bateaux/optimiser.js` |
 | Brider le cache WiredTiger pour rendre un balayage lent est un mauvais calcul : dès que les données dépassent le cache, c'est l'**écriture** qui s'effondre aussi. À 256 Mo, un chargement de 3,2 millions de documents a mis **deux heures** ; à 1 Go, **32 secondes** — les mêmes documents. Et le bridage ne servait à rien : `lus`, la colonne qu'on regarde, ne dépend pas du cache. | `docker/docker-compose.yml` |

@@ -1,5 +1,5 @@
 // =====================================================================
-//  LE BANC — joue les quatre requetes d'un sujet et dit ce qu'elles coutent
+//  LE BANC — joue les sept requetes d'un sujet et dit ce qu'elles coutent
 // =====================================================================
 //  Joue par : make <sujet>-mesurer
 //  Appele avec  --eval 'const SUJET = "1-dune"; const BASE = "dune"'
@@ -28,7 +28,7 @@ if (base.getCollectionNames().length === 0) {
   quit(2);
 }
 
-titre("Les quatre requetes de " + SUJET + ", sur la base telle qu elle est");
+titre("Les sept requetes de " + SUJET + ", sur la base telle qu elle est");
 const mesures = banc(base, REQUETES);
 
 titre("La reponse n a pas change ?");

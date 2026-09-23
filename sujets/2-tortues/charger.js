@@ -153,10 +153,10 @@ const NOMS_TORTUE = ["Crush", "Goliath", "Squirt", "Kaia", "Nemo", "Ariel", "Bub
   "Wave", "Xola", "Yara", "Zephyr", "Ambre", "Brise", "Corail", "Dorade", "Ecume"];
 
 // Le statut UICN de chaque tortue, garde a part : c'est tout ce dont la
-// reponse attendue de R3 a besoin, et 10 000 chaines coutent moins cher
+// reponse attendue de R5 a besoin, et 10 000 chaines coutent moins cher
 // que 10 000 documents.
 const statutDeTortue = new Array(NB_TORTUES + 1);
-const attR4 = [];
+const attR3 = [], attR4 = [];
 
 titre("Les tortues");
 let id = 0;
@@ -195,6 +195,7 @@ while (id < NB_TORTUES) {
     }
     statutDeTortue[id] = e.statutUicn;
     lot.push(doc);
+    if (doc.mensurations.poidsKg >= PARAM.poidsMin) attR3.push(ligneR3(doc));
     if (doc.tags.indexOf(PARAM.tag) >= 0) attR4.push(ligneR4(doc));
   }
   base.tortues.insertMany(lot, { ordered: false });
@@ -206,7 +207,10 @@ dire(d(n(NB_TORTUES), 9) + " tortues en tout");
 //  3. Les observations — sorties de la tortue, et sans rien savoir d elle
 // =====================================================================
 
-const attR1 = [], attR2 = [], attR3 = new Map();
+const attR1 = [], attR2 = [], attR5 = new Map(), attR6 = [];
+// Le nombre d'observations de chaque tortue : R7 en garde les dix
+// premieres. Un entier par tortue, pas un document.
+const vuesDe = new Array(NB_TORTUES + 1).fill(0);
 
 titre("Les observations");
 id = 0;
@@ -230,10 +234,13 @@ while (id < NB_OBSERVATIONS) {
       attR2.push(ligneR2(o));
     if (o.date >= PARAM.moisDebut && o.date < PARAM.moisFin
         && statutDeTortue[o.tortue] === PARAM.statutUicn) {
-      const a = attR3.get(o.site) || { _id: o.site, somme: 0, n: 0 };
+      const a = attR5.get(o.site) || { _id: o.site, somme: 0, n: 0 };
       a.somme += o.scoreSante; a.n++;
-      attR3.set(o.site, a);
+      attR5.set(o.site, a);
     }
+    if (o.site === PARAM.siteMois && o.date.getUTCFullYear() === PARAM.annee
+        && o.date.getUTCMonth() + 1 === PARAM.mois) attR6.push(ligneR6(o));
+    vuesDe[o.tortue]++;
   }
   base.observations.insertMany(lot, { ordered: false });
   if (id % 120000 === 0) dire(d(n(id), 9) + " observations");
@@ -241,15 +248,21 @@ while (id < NB_OBSERVATIONS) {
 dire(d(n(NB_OBSERVATIONS), 9) + " observations en tout");
 
 // =====================================================================
-//  4. La reponse attendue des quatre requetes
+//  4. La reponse attendue des sept requetes
 // =====================================================================
 
 base.reference.insertMany([
   { _id: "R1", intitule: "Les observations d un observateur",       lignes: attR1.sort() },
   { _id: "R2", intitule: "Les observations d un site sur une annee", lignes: attR2.sort() },
-  { _id: "R3", intitule: "Score moyen des especes en danger critique",
-    lignes: [...attR3.values()].map(ligneR3).sort() },
-  { _id: "R4", intitule: "Les tortues portant un tag",              lignes: attR4.sort() }
+  { _id: "R3", intitule: "Les tortues les plus lourdes",            lignes: attR3.sort() },
+  { _id: "R4", intitule: "Les tortues portant un tag",              lignes: attR4.sort() },
+  { _id: "R5", intitule: "Score moyen des especes en danger critique",
+    lignes: [...attR5.values()].map(ligneR5).sort() },
+  { _id: "R6", intitule: "Les observations d un site sur un mois",  lignes: attR6.sort() },
+  { _id: "R7", intitule: "Les dix tortues les plus observees",
+    lignes: vuesDe.map((n, id) => ({ _id: id, n: n })).filter(r => r.n > 0)
+                  .sort((a, b) => b.n - a.n || a._id - b._id).slice(0, 10)
+                  .map(ligneR7).sort() }
 ]);
 
 titre("La base tortues est chargee — et n a aucun index");

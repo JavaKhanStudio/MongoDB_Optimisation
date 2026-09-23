@@ -140,7 +140,7 @@ dire(g("plateformesTransport", 22) + d(transports.length, 8));
 //  2. Les collectes — le gros morceau, et le document polymorphe
 // =====================================================================
 //  Fabriquees par paquets, et jamais gardees en entier : la reponse
-//  attendue des quatre requetes s'accumule au passage, ligne par ligne.
+//  attendue des sept requetes s'accumule au passage, ligne par ligne.
 //  C'est ce qui permet de demander VOLUME=10 sans faire exploser mongosh
 //  — et c'est aussi ce qui rend la reponse attendue INDEPENDANTE des
 //  requetes du sujet. Elle est calculee a partir des donnees, pas en
@@ -152,7 +152,10 @@ const parRegion = new Map(puits.map(p => [p._id, p.region]));
 const versParRegion = new Map(regions.map(r => [r._id, r.vers.map(v => v.nom)]));
 const CAUSES = [["VER", 35], ["TEMPETE", 30], ["PANNE", 25], ["EMBUSCADE", 10]];
 
-const attR1 = [], attR2 = [], attR3 = new Map();
+const parRendement = (a, b) =>
+  b.tonnes / b.dureeMinutes - a.tonnes / a.dureeMinutes || a._id - b._id;
+const attR1 = [], attR2 = [], attR3 = [], attR5 = new Map(), attR6 = [];
+let attR7 = [];
 const LOT = 10000;
 let id = 0;
 
@@ -188,15 +191,22 @@ while (id < NB_COLLECTES) {
     if (c.contremaitre === PARAM.contremaitre) attR1.push(ligneR1(c));
     if (c.puits === PARAM.puitsEchecs && c.statut === "ECHOUEE"
         && c.debut >= PARAM.moisDebut && c.debut < PARAM.moisFin) attR2.push(ligneR2(c));
+    if (c.ver && c.ver.nom === PARAM.ver) attR3.push(ligneR3(c));
     if (c.statut === "REUSSIE" && parRegion.get(c.puits) === PARAM.region
         && c.debut >= PARAM.moisDebut && c.debut < PARAM.moisFin) {
-      const a = attR3.get(c.puits) || { _id: c.puits, tonnes: 0, n: 0 };
+      const a = attR5.get(c.puits) || { _id: c.puits, tonnes: 0, n: 0 };
       a.tonnes += c.tonnes; a.n++;
-      attR3.set(c.puits, a);
+      attR5.set(c.puits, a);
     }
+    if (c.puits === PARAM.puitsMois && c.debut.getUTCFullYear() === PARAM.annee
+        && c.debut.getUTCMonth() + 1 === PARAM.mois) attR6.push(ligneR6(c));
+    if (c.statut === "REUSSIE") attR7.push(c);
   }
   base.collectes.insertMany(lot, { ordered: false });
   if (id % 40000 === 0) dire(d(n(id), 9) + " collectes");
+  // Le top dix du rendement se garde au fil de l'eau, comme celui de R4.
+  attR7.sort(parRendement);
+  attR7 = attR7.slice(0, 12);
 }
 dire(d(n(NB_COLLECTES), 9) + " collectes en tout");
 
@@ -233,16 +243,20 @@ while (id < NB_RELEVES) {
 dire(d(n(NB_RELEVES), 9) + " releves en tout");
 
 // =====================================================================
-//  4. La reponse attendue des quatre requetes
+//  4. La reponse attendue des sept requetes
 // =====================================================================
 
 base.reference.insertMany([
   { _id: "R1", intitule: "Les collectes d un contremaitre",     lignes: attR1.sort() },
   { _id: "R2", intitule: "Les echecs d un puits, du plus recent", lignes: attR2.sort() },
-  { _id: "R3", intitule: "Ce qu une region a sorti sur un mois",
-    lignes: [...attR3.values()].map(ligneR3).sort() },
+  { _id: "R3", intitule: "Les collectes perdues a cause d un ver", lignes: attR3.sort() },
   { _id: "R4", intitule: "Les dix plus fortes secousses d un puits",
-    lignes: attR4.slice(0, 10).map(ligneR4).sort() }
+    lignes: attR4.slice(0, 10).map(ligneR4).sort() },
+  { _id: "R5", intitule: "Ce qu une region a sorti sur un mois",
+    lignes: [...attR5.values()].map(ligneR5).sort() },
+  { _id: "R6", intitule: "Les collectes d un puits sur un mois",  lignes: attR6.sort() },
+  { _id: "R7", intitule: "Les dix collectes au meilleur rendement",
+    lignes: attR7.slice(0, 10).map(ligneR7).sort() }
 ]);
 
 // Un ex aequo entre le dixieme et le onzieme releve rendrait R4

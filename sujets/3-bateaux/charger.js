@@ -108,7 +108,7 @@ const NOMS_B = ["du Nord", "de Brest", "des Glenan", "d Ouessant", "du Ponant", 
   "du Large", "de Minuit", "d Orient"];
 
 // Le pavillon de chaque bateau, garde a part : c'est tout ce dont la
-// reponse attendue de R3 a besoin.
+// reponse attendue de R5 a besoin.
 const pavillonDe = new Map();
 const bateaux = [];
 const imos = [];
@@ -198,8 +198,8 @@ const MARCHANDISES = ["Conteneurs secs", "Conteneurs refrigeres", "Produits chim
 const MOTIFS = [["COMMERCE", 70], ["RELACHE", 12], ["AVITAILLEMENT", 10],
                 ["AVARIE", 5], ["TECHNIQUE", 3]];
 
-const attR1 = [], attR2 = [], attR3 = new Map();
-let attR4 = [];
+const attR1 = [], attR2 = [], attR3 = [], attR5 = new Map(), attR6 = [];
+let attR4 = [], attR7 = [];
 const LOT = 10000;
 let id = 0;
 
@@ -232,38 +232,57 @@ while (id < NB_ESCALES) {
     if (e.bateau === PARAM.imo) attR1.push(ligneR1(e));
     if (e.port === PARAM.port && e.arrivee >= PARAM.anneeDebut && e.arrivee < PARAM.anneeFin)
       attR2.push(ligneR2(e));
+    if (e.arrivee >= PARAM.gnlDebut && e.arrivee < PARAM.gnlFin
+        && e.cargaisons.some(c => c.marchandise === PARAM.marchandise)) attR3.push(ligneR3(e));
+    attR4.push(e);
     const total = e.cargaisons.reduce((s, c) => s + c.tonnes, 0);
     if (e.arrivee >= PARAM.recDebut && e.arrivee < PARAM.recFin
         && pavillonDe.get(e.bateau) === PARAM.pavillon) {
-      const a = attR3.get(e.port) || { _id: e.port, tonnes: 0, n: 0 };
+      const a = attR5.get(e.port) || { _id: e.port, tonnes: 0, n: 0 };
       a.tonnes += total; a.n++;
-      attR3.set(e.port, a);
+      attR5.set(e.port, a);
     }
-    attR4.push({ _id: e._id, bateau: e.bateau, port: e.port, total: total });
+    if (e.port === PARAM.portMois && e.arrivee.getUTCFullYear() === PARAM.annee
+        && e.arrivee.getUTCMonth() + 1 === PARAM.mois) attR6.push(ligneR6(e));
+    attR7.push({ _id: e._id, bateau: e.bateau, port: e.port, total: total });
   }
   base.escales.insertMany(lot, { ordered: false });
   if (id % 50000 === 0) dire(d(n(id), 9) + " escales");
-  attR4.sort((a, b) => b.total - a.total || a._id - b._id);
-  attR4 = attR4.slice(0, 12);
+  attR4.sort((a, b) => b.arrivee - a.arrivee);
+  attR4 = attR4.slice(0, PARAM.dernieres + 2);
+  attR7.sort((a, b) => b.total - a.total || a._id - b._id);
+  attR7 = attR7.slice(0, 12);
 }
 dire(d(n(NB_ESCALES), 9) + " escales en tout");
 
 // =====================================================================
-//  3. La reponse attendue des quatre requetes
+//  3. La reponse attendue des sept requetes
 // =====================================================================
 
 base.reference.insertMany([
   { _id: "R1", intitule: "Le carnet de bord d un bateau",       lignes: attR1.sort() },
   { _id: "R2", intitule: "Les escales d un port sur une annee", lignes: attR2.sort() },
-  { _id: "R3", intitule: "Le tonnage d un pavillon, port par port",
-    lignes: [...attR3.values()].map(ligneR3).sort() },
-  { _id: "R4", intitule: "Les dix plus grosses escales",
-    lignes: attR4.slice(0, 10).map(ligneR4).sort() }
+  { _id: "R3", intitule: "Le GNL debarque sur un mois",           lignes: attR3.sort() },
+  { _id: "R4", intitule: "Les vingt dernieres escales",
+    lignes: attR4.slice(0, PARAM.dernieres).map(ligneR4).sort() },
+  { _id: "R5", intitule: "Le tonnage d un pavillon, port par port",
+    lignes: [...attR5.values()].map(ligneR5).sort() },
+  { _id: "R6", intitule: "Les escales d un port sur un mois",     lignes: attR6.sort() },
+  { _id: "R7", intitule: "Les dix plus grosses escales",
+    lignes: attR7.slice(0, 10).map(ligneR7).sort() }
 ]);
 
-if (attR4.length > 10 && attR4[9].total === attR4[10].total) {
+// R4 ne departage pas deux arrivees a la meme minute : un ex aequo entre
+// la 20e et la 21e rendrait la reponse indecidable.
+if (attR4.length > PARAM.dernieres
+    && +attR4[PARAM.dernieres - 1].arrivee === +attR4[PARAM.dernieres].arrivee) {
   dire("");
-  dire("ATTENTION : ex aequo entre la 10e et la 11e escale — R4 n est pas decidable");
+  dire("ATTENTION : ex aequo entre la 20e et la 21e escale : R4 n est pas decidable");
+  dire("            avec cette graine. Changer GRAINE.");
+}
+if (attR7.length > 10 && attR7[9].total === attR7[10].total) {
+  dire("");
+  dire("ATTENTION : ex aequo entre la 10e et la 11e escale : R7 n est pas decidable");
   dire("            avec cette graine. Changer GRAINE.");
 }
 
