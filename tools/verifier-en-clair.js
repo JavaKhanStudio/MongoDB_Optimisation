@@ -1,7 +1,7 @@
 // =====================================================================
 //  Les requetes EN CLAIR disent-elles la meme chose que requetes.js ?
 // =====================================================================
-//  SUJET.md (section « Les quatre requetes ») et les commentaires de
+//  SUJET.md (section « Les sept requetes ») et les commentaires de
 //  requetes.js montrent chaque requete telle qu'on la tape dans
 //  make <sujet>-mongo : db.collectes.find({ ... }), valeurs en dur. Ce
 //  texte est recopie a la main a cote du JavaScript ; ce banc-ci le joue
@@ -12,8 +12,8 @@
 //    docker exec optimisation-mongo mongosh --quiet \
 //      --eval 'const SUJET = "1-dune"; const BASE = "dune"' \
 //      --file /projet/tools/verifier-en-clair.js
-//  Sort 0 si les huit textes (4 dans SUJET.md, 4 dans requetes.js)
-//  rendent exactement les lignes de requetes.js.
+//  Sort 0 si chaque texte, dans SUJET.md comme dans requetes.js, rend
+//  exactement les lignes du JavaScript.
 // =====================================================================
 
 load("/projet/sujets/outils.js");
@@ -21,11 +21,11 @@ load("/projet/sujets/" + SUJET + "/requetes.js");
 const fs = require("fs");
 const base = db.getSiblingDB(BASE);
 
-// SUJET.md : les blocs ```js de la section « ## Les quatre requetes »,
-// dans l'ordre R1..R4.
+// SUJET.md : les blocs ```js de la section « ## Les sept requetes »,
+// dans l'ordre R1..R7.
 function depuisSujet() {
   const md = fs.readFileSync("/projet/sujets/" + SUJET + "/SUJET.md", "utf8");
-  const debut = md.search(/^## Les quatre requêtes$/m);
+  const debut = md.search(/^## Les sept requêtes$/m);
   if (debut < 0) return [];
   const suite = md.slice(debut + 3);
   const section = suite.slice(0, suite.search(/^## /m) < 0 ? undefined : suite.search(/^## /m));

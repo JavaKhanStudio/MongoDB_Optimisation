@@ -34,7 +34,7 @@ aide:
 	@echo "  Un sujet   (<s> = dune | tortues | bateaux)"
 	@echo "    make <s>               - (re)fabrique la base et la remplit."
 	@echo "                             VOLUME=10 pour dix fois plus de donnees."
-	@echo "    make <s>-mesurer       - joue les quatre requetes du sujet et dit,"
+	@echo "    make <s>-mesurer       - joue les sept requetes du sujet et dit,"
 	@echo "                             pour chacune, combien de documents le"
 	@echo "                             serveur a lus pour rendre combien de lignes"
 	@echo "    make <s>-mongo         - un mongosh sur la base du sujet"

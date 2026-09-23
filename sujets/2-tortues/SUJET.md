@@ -2,14 +2,14 @@
 
 > Le projet fil rouge, huit ans plus tard : **10 000 tortues** suivies et
 > **90 000 observations**. Le modèle est celui de « SQL vers NoSQL », à une
-> chose près — les observations ne tiennent plus dans la tortue. Quatre
-> requêtes ordinaires en lisent **280 861** pour en rendre **2 318**.
+> chose près : les observations ne tiennent plus dans la tortue. Sept
+> requêtes ordinaires en lisent **470 861** pour en rendre **2 599**.
 
 ## Référence
 
 - Charger la base : `make tortues` — `make tortues VOLUME=10` pour dix fois plus
 - Mesurer : `make tortues-mesurer`
-- Les quatre requêtes, en clair : [`requetes.js`](requetes.js)
+- Les sept requêtes, en clair : [`requetes.js`](requetes.js)
 - Un shell sur la base : `make tortues-mongo`
 - Revenir au point de départ sans recharger : `make tortues-remettre`
 - La correction, quand la vôtre sera faite : `git switch correction`,
@@ -54,13 +54,17 @@ cette page sont ceux de `VOLUME=1`.
 
 ---
 
-## Les quatre requêtes
+## Les sept requêtes
 
-Telles qu'on les tape dans `make tortues-mongo`, valeurs en dur. Le banc
-joue les mêmes, écrites en JavaScript dans [`requetes.js`](requetes.js). Sous
-chacune, les champs qu'elle sollicite : c'est là que le serveur travaille.
+Telles qu'on les tape dans `make tortues-mongo`, valeurs en dur. Le banc joue
+les mêmes, écrites en JavaScript dans [`requetes.js`](requetes.js). Sous chacune,
+les champs qu'elle sollicite : c'est là que le serveur travaille.
 
-**R1 — « Tout ce qu'Aline Roy a observé. »**
+### R1 à R4 : un index suffit
+
+Le texte de ces quatre-là ne bouge pas. Tout se joue dans les index qu'on pose.
+
+**R1 : « Tout ce qu'Aline Roy a observé. »**
 
 ```js
 db.observations.find({ observateur: "Aline Roy" })
@@ -68,7 +72,7 @@ db.observations.find({ observateur: "Aline Roy" })
 
 Sollicite : `observateur`, en égalité. Rien d'autre.
 
-**R2 — « Les observations faites à Lady Elliot en 2025, de la plus récente à la plus ancienne. »**
+**R2 : « Les observations faites à Lady Elliot en 2025, de la plus récente à la plus ancienne. »**
 
 ```js
 db.observations.find({
@@ -77,9 +81,30 @@ db.observations.find({
 }).sort({ date: -1 })
 ```
 
-Sollicite : `site` en égalité, `date` en intervalle — et `date` encore, pour le tri.
+Sollicite : `site` en égalité, `date` en intervalle, et `date` encore pour le tri.
 
-**R3 — « Le score de santé moyen des tortues en danger critique observées en juillet 2026, site par site. »**
+**R3 : « Les tortues de 410 kg et plus. »**
+
+```js
+db.tortues.find({ "mensurations.poidsKg": { $gte: 410 } })
+```
+
+Sollicite : `mensurations.poidsKg`, en intervalle : un champ rangé dans un sous-document.
+
+**R4 : « Les tortues marquées migration-longue. »**
+
+```js
+db.tortues.find({ tags: "migration-longue" })
+```
+
+Sollicite : `tags`, en égalité, sur un champ qui est un tableau.
+
+### R5 à R7 : l'index ne suffit plus
+
+Aucun index ne sert ces trois-là tant qu'elles restent écrites ainsi. Il faut
+l'index **et** changer la requête, ou le document qu'elle lit.
+
+**R5 : « Le score de santé moyen des tortues en danger critique observées en juillet 2026, site par site. »**
 
 ```js
 db.observations.aggregate([
@@ -90,30 +115,49 @@ db.observations.aggregate([
 ])
 ```
 
-Sollicite : `date` en intervalle, dans `observations`. Puis, pour chaque observation gardée, l'`_id` de la collection `tortues`. Puis `espece.statutUicn`, en égalité — mais il est dans `tortues`, pas dans `observations`. Enfin `site` et `scoreSante`, pour le regroupement.
+Sollicite : `date` en intervalle, dans `observations`. Puis, pour chaque observation gardée, l'`_id` de la collection `tortues`. Puis `espece.statutUicn`, en égalité ; mais il est dans `tortues`, pas dans `observations`. Enfin `site` et `scoreSante`, pour le regroupement.
 
-**R4 — « Les tortues marquées migration-longue. »**
+**R6 : « Les observations faites à Anakao en mars 2024. »**
 
 ```js
-db.tortues.find({ tags: "migration-longue" })
+db.observations.find({
+  site: "Anakao",
+  $expr: { $and: [ { $eq: [{ $year: "$date" }, 2024] },
+                   { $eq: [{ $month: "$date" }, 3] } ] }
+})
 ```
 
-Sollicite : `tags`, en égalité — sur un champ qui est un tableau.
+Sollicite : `site` en égalité. Puis `date`, mais à travers `$year` et `$month` : ce qui est comparé, c'est le résultat du calcul, pas le champ.
+
+**R7 : « Les dix tortues les plus observées. »**
+
+```js
+db.observations.aggregate([
+  { $group: { _id: "$tortue", n: { $sum: 1 } } },
+  { $sort:  { n: -1, _id: 1 } },
+  { $limit: 10 }
+])
+```
+
+Sollicite : `tortue`, dans chacune des observations, pour les compter ; puis le compte pour le tri : un nombre qui n'est écrit dans aucun document.
 
 ---
 
-## Ce que les quatre requêtes coûtent aujourd'hui
+## Ce que les sept requêtes coûtent aujourd'hui
 
 `make tortues-mesurer`, sur la base fraîchement chargée :
 
 ```
   code  ce qu elle demande                         rendus        lus       cles  plan               ms
-  R1    Les observations d un observateur             754     90 000          0  COLLSCAN           29
-  R2    Les observations d un site sur une annee      179     90 000          0  COLLSCAN+TRI       23
-  R3    Score moyen des especes en danger critiqu      41     90 861        861  COLLSCAN+LOOKUP    30
-  R4    Les tortues portant un tag                  1 344     10 000          0  COLLSCAN           16
+  R1    Les observations d un observateur             754     90 000          0  COLLSCAN           30
+  R2    Les observations d un site sur une annee      179     90 000          0  COLLSCAN+TRI       27
+  R3    Les tortues les plus lourdes                  257     10 000          0  COLLSCAN            8
+  R4    Les tortues portant un tag                  1 344     10 000          0  COLLSCAN           18
+  R5    Score moyen des especes en danger critiqu      41     90 861        861  COLLSCAN+LOOKUP    28
+  R6    Les observations d un site sur un mois         14     90 000          0  COLLSCAN           21
+  R7    Les dix tortues les plus observees             10     90 000          0  COLLSCAN           25
 
-  280 861 documents lus pour 2 318 lignes rendues  —  121 lus pour 1 rendu,  98 ms en tout.
+  470 861 documents lus pour 2 599 lignes rendues  —  181 lus pour 1 rendu,  157 ms en tout.
 ```
 
 **`rendus`** est ce que la question demande : il ne bougera pas. **`lus`** est ce
@@ -152,7 +196,7 @@ les index et les copies sans recharger ; `make tortues` refait la base entière.
 
 ### Exercice 2
 
-Les index. R1, R2 et R4 se règlent sans toucher au texte de la requête.
+Les index. R1 à R4 se règlent sans toucher au texte de la requête.
 
 1. Poser l'index qui sert R1, relancer `make tortues-mesurer`, relever `lus`.
 2. Pour R2, poser `{ site: 1 }` seul, mesurer, et relever `lus`, `cles` et le
@@ -161,31 +205,64 @@ Les index. R1, R2 et R4 se règlent sans toucher au texte de la requête.
 4. Poser `{ site: 1, date: 1 }`, mesurer, et relever les mêmes trois.
 5. Dire lequel des trois a coûté des documents, lequel a coûté des clés, et
    écrire la règle qui décide de l'ordre.
-6. Poser l'index qui sert R4 — `tags` est un tableau, et ça ne change rien à la
+6. Poser l'index qui sert R3, mesurer, et relever `lus`.
+7. Compter les tortues de 100 kg et plus avec `.explain("executionStats")`,
+   relever `totalKeysExamined` et `totalDocsExamined`, et dire ce que l'index
+   a économisé sur cette requête-là.
+8. Poser l'index qui sert R4 : `tags` est un tableau, et ça ne change rien à la
    façon de le poser.
-7. Relever le gain de R4, le comparer à celui de R1, et expliquer l'écart avec
+9. Relever le gain de R4, le comparer à celui de R1, et expliquer l'écart avec
    le nombre de documents que chaque requête rend.
-8. Lancer `db.tortues.stats().indexSizes` et dire ce que l'index de R4 a coûté.
+10. Lancer `db.tortues.stats().indexSizes` et dire ce que l'index de R4 a coûté.
 
 ### Exercice 3
 
-R3 demande le score des tortues **en danger critique**. Une observation ne sait
+R5 demande le score des tortues **en danger critique**. Une observation ne sait
 pas de quelle espèce est la tortue qu'elle décrit : elle connaît son `_id`.
 
-1. Compter combien d'observations R3 doit ouvrir de tortues avant de pouvoir en
+1. Compter combien d'observations R5 doit ouvrir de tortues avant de pouvoir en
    jeter une seule.
 2. Faire descendre le statut UICN dans chaque observation, en une seule requête.
-3. Réécrire R3 dans [`requetes.js`](requetes.js) pour qu'elle s'en serve, poser
+3. Réécrire R5 dans [`requetes.js`](requetes.js) pour qu'elle s'en serve, poser
    l'index qui va avec, et mesurer.
 4. Vérifier que `make tortues-mesurer` dit toujours que la réponse est celle du
    chargement.
 5. L'UICN reclasse `Eretmochelys imbricata` de `CR` à `EN` : le changer dans
    `especes`, et nulle part ailleurs.
-6. Relancer R3, et dire combien d'endroits portent maintenant une valeur périmée.
+6. Relancer R5, et dire combien d'endroits portent maintenant une valeur périmée.
 7. Écrire la ou les requêtes qui remettent les trois collections d'accord.
 8. Dire ce qui rend cette copie acceptable malgré ça.
 
-### Exercice 4  (Exploration)
+### Exercice 4
+
+R6 demande les observations d'un site sur un mois, et le mois y est écrit comme
+on le dit : l'année vaut 2024, le mois vaut 3.
+
+1. Poser un index sur `{ site: 1, date: 1 }`, mesurer, et relever `lus`, `cles`
+   et `rendus` de R6.
+2. Dire quelle partie du filtre l'index a servie, et laquelle il n'a pas pu
+   servir.
+3. Réécrire R6 dans [`requetes.js`](requetes.js) sans `$expr`, pour la même
+   réponse, et mesurer.
+4. Vérifier que `make tortues-mesurer` dit toujours que la réponse est celle du
+   chargement.
+
+### Exercice 5
+
+R7 demande les dix tortues les plus observées. Ce nombre d'observations n'est
+écrit nulle part : il se recompte à chaque fois.
+
+1. Poser un index sur `{ tortue: 1 }` dans `observations`, et mesurer : dire ce
+   qu'il a changé.
+2. Écrire dans chaque tortue son nombre d'observations, en une seule requête.
+3. Poser l'index qui permet à R7 de rendre dix lignes sans lire un seul
+   document, et réécrire R7 pour qu'elle s'en serve.
+4. La tortue `914` vient d'être vue deux fois : ajouter ses deux observations,
+   sans toucher au champ que vous venez d'écrire.
+5. Relancer R7 et dire ce qui est faux.
+6. Écrire l'ajout d'une observation qui tient le compte à jour.
+
+### Exercice 6  (Exploration)
 
 Sortir les tortues inscrites au programme `ARGOI` **depuis le 1er janvier 2024**.
 Elles sont **341**.

@@ -5,29 +5,33 @@
   quoi les sentir passer. Le modele est propre. Ce qui manque, ce sont les
   index, et les champs qui permettraient de ne pas aller les chercher ailleurs.
 
-  Chaque sujet porte quatre requetes. Elles rendent quelques lignes, et le
+  Chaque sujet porte sept requetes. Elles rendent quelques lignes, et le
   serveur lit des centaines de milliers de documents pour les trouver. Le
   travail consiste a faire tomber ce nombre SANS CHANGER LA REPONSE.
+  R1 a R4 se reglent avec un index. R5 a R7 demandent l'index ET une
+  requete reecrite.
 
   ------------------------------------------------------------------------
    1 - dune       l epice sur Arrakis           100 000 documents
                    37 500 collectes,  62 500 releves de vibration
                   ce qu on y apprend : l index simple, l ordre des cles
-                  d un index compose, la reference etendue, le tri bloquant
+                  d un index compose, le tri bloquant, la reference
+                  etendue, le champ calcule
                   make dune          sujets/1-dune/SUJET.md
 
    2 - tortues    le projet fil rouge           100 000 documents
                   10 000 tortues, 90 000 observations
                   ce qu on y apprend : la cle etrangere que SQL indexait
-                  tout seul, l index multicle sur un tableau, la copie de
-                  copie, et pourquoi un index peu selectif ne rapporte rien
+                  tout seul, l index multicle sur un tableau, pourquoi un
+                  index peu selectif ne rapporte rien, la copie de copie,
+                  et le compteur a tenir a jour
                   make tortues       sujets/2-tortues/SUJET.md
 
    3 - bateaux    civils et militaires          100 000 documents
                   4 000 bateaux, 94 500 escales
-                  ce qu on y apprend : deux requetes sur quatre qu AUCUN
-                  index ne peut servir — la reference etendue, le champ
-                  calcule, et l index partiel
+                  ce qu on y apprend : l index multicle sur un tableau de
+                  sous-documents, l index qui sert un tri sans filtre, la
+                  reference etendue, le champ calcule, et l index partiel
                   make bateaux       sujets/3-bateaux/SUJET.md
   ------------------------------------------------------------------------
 
@@ -44,7 +48,7 @@
   la question n'est pas optimisee, elle est fausse.
 
   make <sujet>            (re)fabrique la base
-  make <sujet>-mesurer    joue les quatre requetes et dit ce qu'elles coutent
+  make <sujet>-mesurer    joue les sept requetes et dit ce qu'elles coutent
   make <sujet>-mongo      un mongosh sur la base
   make <sujet>-remettre   retire les index et les copies, sans recharger
   make aide               tout le reste
