@@ -1,4 +1,4 @@
-# Sujet 1 — Dune
+# Sujet 1 : Dune
 
 > L'exploitation de l'épice sur Arrakis, dans le modèle document qu'on lui a
 > donné en « SQL vers NoSQL ». Le modèle est le même. Ce qui a changé, c'est
@@ -7,7 +7,7 @@
 
 ## Référence
 
-- Charger la base : `make dune` — `make dune VOLUME=10` pour dix fois plus
+- Charger la base : `make dune`, ou `make dune VOLUME=10` pour dix fois plus
 - Mesurer : `make dune-mesurer`
 - Les sept requêtes, en clair : [`requetes.js`](requetes.js)
 - Un shell sur la base : `make dune-mongo`
@@ -172,11 +172,11 @@ optimisée.
 
 `lus` ne sort pas d'`explain()` : il sort des compteurs du serveur, relevés avant
 et après la requête. Ils comptent **tout**, d'un seul nombre, quelle que soit la
-forme du plan — là où `explain()` éparpille ses comptes dans l'arbre et laisse
+forme du plan, là où `explain()` éparpille ses comptes dans l'arbre et laisse
 lire le mauvais nœud.
 
 **La réponse, elle, ne doit pas changer.** Elle a été calculée au chargement, à
-part, à partir des données générées — pas en rejouant ces requêtes-là. Le banc la
+part, à partir des données générées, pas en rejouant ces requêtes-là. Le banc la
 recompare à chaque passage. Optimiser, c'est changer le chemin sans changer la
 réponse ; une requête devenue rapide qui ne répond plus à la question n'est pas
 optimisée, elle est fausse.
@@ -273,7 +273,7 @@ tonnes divisées par la durée, et il n'est écrit nulle part.
 ### Exercice 6  (Exploration)
 
 Sortir, pour Gurney Halleck, **la date et le puits** de chacune de ses 169
-collectes — et obtenir d'`explain("executionStats")` qu'il annonce
+collectes, et obtenir d'`explain("executionStats")` qu'il annonce
 `totalDocsExamined: 0`.
 
 1. L'écrire de la façon la plus directe, et relever `totalDocsExamined`.

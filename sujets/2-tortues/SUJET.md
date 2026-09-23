@@ -1,4 +1,4 @@
-# Sujet 2 — Les tortues
+# Sujet 2 : Les tortues
 
 > Le projet fil rouge, huit ans plus tard : **10 000 tortues** suivies et
 > **90 000 observations**. Le modèle est celui de « SQL vers NoSQL », à une
@@ -7,7 +7,7 @@
 
 ## Référence
 
-- Charger la base : `make tortues` — `make tortues VOLUME=10` pour dix fois plus
+- Charger la base : `make tortues`, ou `make tortues VOLUME=10` pour dix fois plus
 - Mesurer : `make tortues-mesurer`
 - Les sept requêtes, en clair : [`requetes.js`](requetes.js)
 - Un shell sur la base : `make tortues-mongo`
@@ -27,7 +27,7 @@
 
   tortues        _id, nom, espece{nomScientifique, nomCommun, statutUicn},
                  mensurations{}, tags[], programmes[{acronyme, dateInscription}],
-                 habitat{nom, aireProtegee}          — absent si on ne le connaît pas
+                 habitat{nom, aireProtegee}          (absent si on ne le connaît pas)
 
   observations   _id, tortue, site, observateur, date, scoreSante
 ```
@@ -44,8 +44,8 @@ document, une campagne par an. À 10 000 tortues suivies pendant huit ans, le
 tableau ne s'arrête jamais de grossir. C'est le 1:N non borné, et il sort.
 
 Ce qui était recopié l'est resté : l'espèce et l'habitat sont dans la tortue, le
-protocole dans son programme. Ce qui manque, ce sont les **index** — il n'y en a
-aucun en dehors de ceux des `_id` — et la copie qui permettrait à une observation
+protocole dans son programme. Ce qui manque, ce sont les **index** : il n'y en a
+aucun en dehors de ceux des `_id`, et la copie qui permettrait à une observation
 de parler de la tortue qu'elle observe.
 
 **Les données ne sont pas un dump** : elles se fabriquent au chargement à partir
@@ -165,11 +165,11 @@ que le serveur a dû parcourir pour le trouver : c'est lui qu'on fait tomber.
 
 `lus` ne sort pas d'`explain()` : il sort des compteurs du serveur, relevés avant
 et après la requête. Ils comptent **tout**, d'un seul nombre, quelle que soit la
-forme du plan — là où `explain()` éparpille ses comptes dans l'arbre et laisse
+forme du plan, là où `explain()` éparpille ses comptes dans l'arbre et laisse
 lire le mauvais nœud.
 
 **La réponse, elle, ne doit pas changer.** Elle a été calculée au chargement, à
-part, à partir des données générées — pas en rejouant ces requêtes-là. Optimiser,
+part, à partir des données générées, pas en rejouant ces requêtes-là. Optimiser,
 c'est changer le chemin sans changer la réponse.
 
 ---
