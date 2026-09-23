@@ -1,4 +1,4 @@
-# Sujet 3 — Les bateaux
+# Sujet 3 : Les bateaux
 
 > La flotte civile et militaire de « SQL vers NoSQL », quatre ans de trafic plus
 > tard : **4 000 bateaux**, **94 500 escales**. Le modèle n'a pas bougé. Sept
@@ -7,7 +7,7 @@
 
 ## Référence
 
-- Charger la base : `make bateaux` — `make bateaux VOLUME=10` pour dix fois plus
+- Charger la base : `make bateaux`, ou `make bateaux VOLUME=10` pour dix fois plus
 - Mesurer : `make bateaux-mesurer`
 - Les sept requêtes, en clair : [`requetes.js`](requetes.js)
 - Un shell sur la base : `make bateaux-mongo`
@@ -25,7 +25,7 @@
   bateaux      _id = l imo, nom, categorie, pavillon, tirantEauM, portAttache?
                categorie = CIVIL      ->  armateur, typeCivil, portEnLourdT, capaciteEvp?
                categorie = MILITAIRE  ->  marine, classe, equipage, propulsionNucleaire
-               une seule collection, deux formes — l heritage de SQL a disparu
+               une seule collection, deux formes : l heritage de SQL a disparu
 
   capitaines   _id = le nom, brevet, commandements[{bateau, debut, fin?}]
 
@@ -43,7 +43,7 @@
 **Ce qui a changé depuis « SQL vers NoSQL ».** Là-bas, l'escale portait une
 **copie** du bateau (nom, imo, catégorie) et du port. Ici elle ne porte que
 l'imo et le nom du port : une référence, propre et normale. C'est exactement ce
-qu'on va devoir étendre — mais cette fois en sachant ce que ça achète.
+qu'on va devoir étendre, mais cette fois en sachant ce que ça achète.
 
 `depart` absent veut dire que le bateau est **encore à quai**. Une cargaison
 n'existe pas sans son escale : elle est dedans.
@@ -171,11 +171,11 @@ que le serveur a dû parcourir pour le trouver : c'est lui qu'on fait tomber.
 
 `lus` ne sort pas d'`explain()` : il sort des compteurs du serveur, relevés avant
 et après la requête. Ils comptent **tout**, d'un seul nombre, quelle que soit la
-forme du plan — là où `explain()` éparpille ses comptes dans l'arbre et laisse
+forme du plan, là où `explain()` éparpille ses comptes dans l'arbre et laisse
 lire le mauvais nœud.
 
 **La réponse, elle, ne doit pas changer.** Elle a été calculée au chargement, à
-part, à partir des données générées — pas en rejouant ces requêtes-là.
+part, à partir des données générées, pas en rejouant ces requêtes-là.
 
 ---
 
@@ -256,8 +256,8 @@ la somme des cargaisons de l'escale, et il n'est écrit nulle part.
 2. Écrire le tonnage total dans chaque escale, en une seule requête.
 3. Poser l'index qui permet à R7 de rendre dix lignes en lisant dix documents,
    et réécrire R7 pour qu'elle s'en serve.
-4. Ajouter une cargaison de 90 000 tonnes à l'escale `35` — avec elle, c'est
-   l'escale la plus chargée du fichier — sans toucher au champ que vous venez
+4. Ajouter une cargaison de 90 000 tonnes à l'escale `35` (avec elle, c'est
+   l'escale la plus chargée du fichier) sans toucher au champ que vous venez
    d'écrire.
 5. Relancer R7 et dire ce qui est faux.
 6. Écrire la requête qui ajoute une cargaison **et** tient le total à jour.
@@ -266,7 +266,7 @@ la somme des cargaisons de l'escale, et il n'est écrit nulle part.
 
 Les escales pour `AVARIE` sont **4 721** sur 94 500. On veut les sortir, de la
 plus récente à la plus ancienne, servies par un index qui pèse **moins de
-100 000 octets** — l'index ordinaire qui fait le travail en pèse 1 118 208.
+100 000 octets** ; l'index ordinaire qui fait le travail en pèse 1 118 208.
 
 1. Poser l'index ordinaire, et relever sa taille avec
    `db.escales.stats().indexSizes`.
