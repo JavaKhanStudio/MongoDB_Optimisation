@@ -1,0 +1,5 @@
+# make.cmd et windows.ps1 ne servent que sous Windows : ils y arrivent en
+# fins de ligne CRLF quel que soit le core.autocrlf de l'etudiant. cmd.exe
+# lit mal un .cmd en LF.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
