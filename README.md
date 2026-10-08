@@ -1,5 +1,7 @@
 # Optimisation d'une collection
 
+<p align="center"><img src="icon.png" width="220" alt="Une fusée qui décolle sous un croissant de lune"></p>
+
 > Les trois modèles document écrits en « SQL vers NoSQL », remplis cette fois
 > de **300 000 documents**, et sept requêtes par base qui vont avec : quatre
 > qu'un index suffit à régler, trois où il faut aussi changer la requête. Le modèle est propre.
